@@ -1,0 +1,102 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type Direction = "in" | "out";
+type Transaction = { date:string; month:number; time:string; description:string; category:string; direction:Direction; amount:number; balance:number; detail:string };
+type Category = { direction:Direction; category:string; count:number; amount:number };
+type Month = { month:string; in:number; out:number; ending:number };
+type Report = { summary:{ opening:number; totalIn:number; totalOut:number; ending:number; net:number; edc:number; period:string; transactions:number }; months:Month[]; categories:Category[]; transactions:Transaction[] };
+
+const colors = ["#137a4e", "#3f6f8f", "#d3a33c", "#79a994", "#9a7d58", "#b8c6be", "#dce5df"];
+const money = (n:number) => new Intl.NumberFormat("th-TH", { minimumFractionDigits:2, maximumFractionDigits:2 }).format(n);
+const compact = (n:number) => n >= 1e6 ? `${(n/1e6).toFixed(2)} ล้าน` : money(n);
+
+export default function Home() {
+  const [data,setData] = useState<Report|null>(null);
+  const [direction,setDirection] = useState<"all"|Direction>("all");
+  const [category,setCategory] = useState("all");
+  const [month,setMonth] = useState(0);
+  const [query,setQuery] = useState("");
+  const [page,setPage] = useState(1);
+  const [expanded,setExpanded] = useState<null|"income"|"outcome"|"monthly">(null);
+
+  useEffect(()=>{ fetch("/sangchai-report-data.json").then(r=>r.json()).then(setData); },[]);
+  useEffect(()=>setPage(1),[direction,category,month,query]);
+
+  const rows = useMemo(()=>data?.transactions.filter(t =>
+    (direction === "all" || t.direction === direction) &&
+    (category === "all" || t.category === category) &&
+    (!month || t.month === month) &&
+    (!query || `${t.date} ${t.time} ${t.description} ${t.detail}`.toLowerCase().includes(query.toLowerCase()))
+  ) ?? [],[data,direction,category,month,query]);
+
+  if (!data) return <main className="loading"><div className="pulse"/><p>กำลังจัดเตรียมรายงานบัญชี…</p></main>;
+  const income = data.categories.filter(c=>c.direction==="in");
+  const outcome = data.categories.filter(c=>c.direction==="out");
+  const incomeTotal = income.reduce((s,c)=>s+c.amount,0);
+  const maxMonth = Math.max(...data.months.flatMap(m=>[m.in,m.out]));
+  const pageSize = 30, pageCount = Math.ceil(rows.length/pageSize), shown = rows.slice((page-1)*pageSize,page*pageSize);
+  const catOptions = data.categories.filter(c=>direction==="all" || c.direction===direction);
+  const donut = (items:Category[], total:number) => {
+    let cursor=0; return `conic-gradient(${items.map((c,i)=>{const start=cursor;cursor+=c.amount/total*100;return `${colors[i%colors.length]} ${start}% ${cursor}%`}).join(",")})`;
+  };
+  const selectCategory = (c:Category) => { setDirection(c.direction); setCategory(c.category); document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"}); };
+
+  return <main>
+    <header className="topbar">
+      <div className="brand"><span className="brandmark">สช</span><div><strong>แสงชัยพาณิชย์</strong><small>รายงานวิเคราะห์บัญชี</small></div></div>
+      <nav><a href="#overview">ภาพรวม</a><a href="#composition">สัดส่วน</a><a href="#transactions">รายการเดินบัญชี</a></nav>
+      <div className="period">1 ม.ค. – 30 มิ.ย. 2569</div>
+    </header>
+
+    <section className="hero" id="overview">
+      <div><p className="eyebrow">บัญชีออมทรัพย์ •••• 3518</p><h1>ภาพรวมการเงิน<br/>ที่ตรวจสอบต่อได้</h1><p className="lead">สรุปจาก Statement 118 หน้า ครบ {data.summary.transactions.toLocaleString("th-TH")} รายการ กดที่กราฟหรือหมวดเพื่อเจาะดูรายการต้นทาง</p></div>
+      <div className="balanceCard"><span>ยอดคงเหลือ ณ 30 มิ.ย. 2569</span><strong>฿{money(data.summary.ending)}</strong><div className="balanceMeta"><span>ต้นงวด ฿{compact(data.summary.opening)}</span><b className="negative">สุทธิ {money(data.summary.net)} บาท</b></div></div>
+    </section>
+
+    <section className="kpis">
+      <button className="kpi" onClick={()=>{setDirection("in");setCategory("all");document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"})}}><span>เงินเข้าทั้งหมด</span><strong className="positive">฿{compact(data.summary.totalIn)}</strong><small>3,625 รายการ · กดเพื่อดู</small></button>
+      <button className="kpi" onClick={()=>{setDirection("out");setCategory("all");document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"})}}><span>เงินออกทั้งหมด</span><strong className="negative">฿{compact(data.summary.totalOut)}</strong><small>1,157 รายการ · กดเพื่อดู</small></button>
+      <button className="kpi" onClick={()=>{setDirection("in");setCategory("EDC / Thai QR");document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"})}}><span>EDC / QR และยอดขายบัตร</span><strong>฿{compact(data.summary.edc)}</strong><small>42.43% ของเงินเข้า</small></button>
+    </section>
+
+    <section className="dashboardGrid" id="composition">
+      <article className="panel monthlyPanel">
+        <div className="panelHead"><div><p className="eyebrow">แนวโน้ม 6 เดือน</p><h2>เงินเข้า–ออก รายเดือน</h2></div><button className="iconButton" onClick={()=>setExpanded("monthly")} aria-label="ขยายกราฟรายเดือน">↗</button></div>
+        <button className="monthChart" onClick={()=>setExpanded("monthly")} aria-label="ขยายกราฟเงินเข้าออก">
+          {data.months.map((m,i)=><div className="monthCol" key={m.month}><div className="barPair"><i className="bar inBar" style={{height:`${m.in/maxMonth*100}%`}}/><i className="bar outBar" style={{height:`${m.out/maxMonth*100}%`}}/></div><b>{m.month}</b><small>{compact(m.ending)}</small></div>)}
+        </button>
+        <div className="legend"><span><i className="dot green"/>เงินเข้า</span><span><i className="dot red"/>เงินออก</span><span>ตัวเลขใต้เดือน = ยอดคงเหลือ</span></div>
+      </article>
+
+      <article className="panel compositionPanel">
+        <div className="panelHead"><div><p className="eyebrow">องค์ประกอบรายรับ</p><h2>เงินเข้ามาจากอะไร</h2></div><button className="iconButton" onClick={()=>setExpanded("income")} aria-label="ขยายกราฟวงกลม">↗</button></div>
+        <button className="donutWrap" onClick={()=>setExpanded("income")} aria-label="ขยายกราฟสัดส่วนเงินเข้า"><span className="donut" style={{background:donut(income,incomeTotal)}}><span><b>฿179.60</b><small>ล้านบาท</small></span></span></button>
+        <div className="categoryList">{income.slice().sort((a,b)=>b.amount-a.amount).map((c,i)=><button key={c.category} onClick={()=>selectCategory(c)}><i style={{background:colors[i%colors.length]}}/><span>{c.category}<small>{c.count.toLocaleString("th-TH")} รายการ</small></span><b>{(c.amount/incomeTotal*100).toFixed(1)}%</b></button>)}</div>
+      </article>
+    </section>
+
+    <section className="panel drillPanel">
+      <div className="panelHead"><div><p className="eyebrow">หมวดสำคัญ</p><h2>กดเพื่อเจาะดูรายละเอียด</h2></div><button className="textButton" onClick={()=>setExpanded("outcome")}>ดูสัดส่วนเงินออก</button></div>
+      <div className="drillGrid">{[...data.categories].sort((a,b)=>b.amount-a.amount).slice(0,8).map(c=><button className="drillCard" key={`${c.direction}-${c.category}`} onClick={()=>selectCategory(c)}><span className={c.direction==="in"?"typeIn":"typeOut"}>{c.direction==="in"?"เงินเข้า":"เงินออก"}</span><h3>{c.category}</h3><strong>฿{money(c.amount)}</strong><small>{c.count.toLocaleString("th-TH")} รายการ <b>เปิดดู →</b></small></button>)}</div>
+    </section>
+
+    <section className="panel transactionPanel" id="transactions">
+      <div className="panelHead"><div><p className="eyebrow">ตรวจสอบต้นทาง</p><h2>รายการเดินบัญชี</h2><p className="muted">พบ {rows.length.toLocaleString("th-TH")} รายการ</p></div></div>
+      <div className="filters">
+        <label>ประเภท<select value={direction} onChange={e=>{setDirection(e.target.value as typeof direction);setCategory("all")}}><option value="all">ทั้งหมด</option><option value="in">เงินเข้า</option><option value="out">เงินออก</option></select></label>
+        <label>หมวด<select value={category} onChange={e=>setCategory(e.target.value)}><option value="all">ทุกหมวด</option>{catOptions.map(c=><option key={`${c.direction}-${c.category}`} value={c.category}>{c.category}</option>)}</select></label>
+        <label>เดือน<select value={month} onChange={e=>setMonth(Number(e.target.value))}><option value="0">ทุกเดือน</option>{data.months.map((m,i)=><option value={i+1} key={m.month}>{m.month} 2569</option>)}</select></label>
+        <label className="search">ค้นหา<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ชื่อ รายละเอียด วันที่…"/></label>
+        {(direction!=="all"||category!=="all"||month||query)&&<button className="reset" onClick={()=>{setDirection("all");setCategory("all");setMonth(0);setQuery("")}}>ล้างตัวกรอง</button>}
+      </div>
+      <div className="tableWrap"><table><thead><tr><th>วันและเวลา</th><th>รายการ / รายละเอียด</th><th>ประเภท</th><th className="number">จำนวนเงิน</th><th className="number">ยอดคงเหลือ</th></tr></thead><tbody>{shown.map((t,i)=><tr key={`${t.date}-${t.time}-${i}`}><td><b>{t.date}</b><small>{t.time} น.</small></td><td><b>{t.description}</b><small>{t.detail || "—"}</small></td><td><span className={t.direction==="in"?"pill inPill":"pill outPill"}>{t.category}</span></td><td className={`number ${t.direction==="in"?"positive":"negative"}`}><b>{t.direction==="in"?"+":"−"} {money(t.amount)}</b></td><td className="number">{money(t.balance)}</td></tr>)}</tbody></table></div>
+      {pageCount>1&&<div className="pagination"><button disabled={page===1} onClick={()=>setPage(p=>p-1)}>← ก่อนหน้า</button><span>หน้า {page.toLocaleString("th-TH")} จาก {pageCount.toLocaleString("th-TH")}</span><button disabled={page===pageCount} onClick={()=>setPage(p=>p+1)}>ถัดไป →</button></div>}
+    </section>
+
+    <footer>ข้อมูลจาก KBank Statement รอบ 01/01/2026–30/06/2026 · ตัวเลขรวมตรวจสอบตรงกับยอดสรุปของธนาคาร</footer>
+
+    {expanded&&<div className="modal" role="dialog" aria-modal="true" onClick={()=>setExpanded(null)}><div className="modalCard" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setExpanded(null)}>×</button>{expanded==="monthly"?<><p className="eyebrow">มุมมองขนาดใหญ่</p><h2>เงินเข้า–ออก และยอดคงเหลือรายเดือน</h2><div className="largeMonthChart">{data.months.map((m,i)=><div key={m.month}><div className="largeBars"><i style={{height:`${m.in/maxMonth*100}%`}}/><i style={{height:`${m.out/maxMonth*100}%`}}/></div><b>{m.month}</b><small>เข้า ฿{compact(m.in)}<br/>ออก ฿{compact(m.out)}<br/>คงเหลือ ฿{compact(m.ending)}</small></div>)}</div></>:<><p className="eyebrow">มุมมองขนาดใหญ่</p><h2>{expanded==="income"?"สัดส่วนเงินเข้า":"สัดส่วนเงินออก"}</h2>{(()=>{const list=expanded==="income"?income:outcome;const total=list.reduce((s,c)=>s+c.amount,0);return <div className="largeDonutLayout"><span className="donut largeDonut" style={{background:donut(list,total)}}><span><b>฿{compact(total)}</b><small>{list.reduce((s,c)=>s+c.count,0).toLocaleString("th-TH")} รายการ</small></span></span><div className="categoryList largeList">{list.slice().sort((a,b)=>b.amount-a.amount).map((c,i)=><button key={c.category} onClick={()=>{setExpanded(null);selectCategory(c)}}><i style={{background:colors[i%colors.length]}}/><span>{c.category}<small>{c.count.toLocaleString("th-TH")} รายการ</small></span><b>฿{compact(c.amount)} · {(c.amount/total*100).toFixed(1)}%</b></button>)}</div></div>})()}</>}</div></div>}
+  </main>;
+}
