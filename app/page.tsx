@@ -53,24 +53,24 @@ export default function Home() {
   const donut = (items:Category[], total:number) => {
     let cursor=0; return `conic-gradient(${items.map((c,i)=>{const start=cursor;cursor+=c.amount/total*100;return `${colors[i%colors.length]} ${start}% ${cursor}%`}).join(",")})`;
   };
-  const selectCategory = (c:Category) => { setDirection(c.direction); setCategory(c.category); document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"}); };
+  const selectCategory = (c:Category) => { setDirection(c.direction); setCategory(c.category); document.getElementById("deposits")?.scrollIntoView({behavior:"smooth"}); };
 
   return <main>
     <header className="topbar">
-      <div className="brand"><img className="brandLogo" src="/sangchai-logo.jpeg" alt="Sangchai Panich Parts Chiangmai"/><div><strong>แสงชัยพาณิชย์</strong><small>รายงานวิเคราะห์บัญชี</small></div></div>
-      <nav><a className="executiveLink" href="/executive">สรุปผู้บริหาร 1 หน้า</a><a href="#overview">ภาพรวม</a><a href="#composition">สัดส่วน</a><a href="#banks">ธนาคาร</a><a href="#daily">รายวัน</a><a href="#transactions">รายการเดินบัญชี</a></nav>
+      <div className="brand"><img className="brandLogo" src="/sangchai-logo.jpeg" alt="Sangchai Panich Parts Chiangmai"/><div><strong>KBANK 1-6/69</strong><small>สรุปรอบบัญชี แสงชัยพาณิชย์</small></div></div>
+      <nav><a className="executiveLink" href="/executive">สรุปผู้บริหาร 1 หน้า</a><a href="#overview">ภาพรวม</a><a href="#deposits">เงินฝาก</a><a href="#banks">ธนาคาร</a></nav>
       <div className="period">1 ม.ค. – 30 มิ.ย. 2569</div>
     </header>
 
     <section className="hero" id="overview">
-      <div><p className="eyebrow">บัญชีออมทรัพย์ •••• 3518</p><h1>ภาพรวมการเงิน<br/>ที่ตรวจสอบต่อได้</h1><p className="lead">สรุปจาก Statement 118 หน้า ครบ {data.summary.transactions.toLocaleString("th-TH")} รายการ กดที่กราฟหรือหมวดเพื่อเจาะดูรายการต้นทาง</p></div>
+      <div><p className="eyebrow">KBANK 1-6/69 · บัญชีออมทรัพย์ •••• 3518</p><h1>สรุปรอบบัญชี<br/>มกราคม–มิถุนายน 2569</h1><p className="lead">แสดงเฉพาะภาพรวม ยอดเงินฝาก และการโอนแยกตามธนาคาร โดยตัดรายละเอียดรายการเดินบัญชีรายรายการออกแล้ว</p></div>
       <div className="balanceCard"><span>ยอดคงเหลือ ณ 30 มิ.ย. 2569</span><strong>฿{compact(data.summary.ending)}</strong><small className="exactLight">ยอดจริง ฿{money(data.summary.ending)}</small><div className="balanceMeta"><span>ต้นงวด ฿{money(data.summary.opening)}</span><b>เปลี่ยนแปลง {money(data.summary.net)} บาท</b></div></div>
     </section>
 
     <section className="kpis">
-      <button className="kpi" onClick={()=>{setDirection("in");setCategory("all");document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"})}}><span>เงินเข้าทั้งหมด</span><strong className="positive">฿{compact(data.summary.totalIn)}</strong><small className="exact">ยอดจริง ฿{money(data.summary.totalIn)}</small><small>3,625 รายการ · เฉลี่ย ฿{money(data.summary.totalIn/3625)} ต่อรายการ</small></button>
-      <button className="kpi" onClick={()=>{setDirection("out");setCategory("all");document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"})}}><span>เงินออกทั้งหมด</span><strong className="negative">฿{compact(data.summary.totalOut)}</strong><small className="exact">ยอดจริง ฿{money(data.summary.totalOut)}</small><small>1,157 รายการ · เฉลี่ย ฿{money(data.summary.totalOut/1157)} ต่อรายการ</small></button>
-      <button className="kpi" onClick={()=>{setDirection("in");setCategory("EDC / Thai QR");document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"})}}><span>EDC / QR และยอดขายบัตร</span><strong>฿{compact(data.summary.edc)}</strong><small className="exact">ยอดจริง ฿{money(data.summary.edc)}</small><small>42.43% ของเงินเข้าทั้งหมด</small></button>
+      <button className="kpi" onClick={()=>document.getElementById("deposits")?.scrollIntoView({behavior:"smooth"})}><span>เงินฝาก/เงินเข้าทั้งหมด</span><strong className="positive">฿{compact(data.summary.totalIn)}</strong><small className="exact">ยอดจริง ฿{money(data.summary.totalIn)}</small><small>3,625 รายการ · กดเพื่อดูประเภทเงินฝาก</small></button>
+      <button className="kpi" onClick={()=>document.getElementById("banks")?.scrollIntoView({behavior:"smooth"})}><span>รับโอนผ่านธนาคาร</span><strong>฿{compact(transferIn)}</strong><small className="exact">ยอดจริง ฿{money(transferIn)}</small><small>แยกตามธนาคารต้นทางใน Statement</small></button>
+      <button className="kpi" onClick={()=>document.getElementById("deposits")?.scrollIntoView({behavior:"smooth"})}><span>EDC / QR และยอดขายบัตร</span><strong>฿{compact(data.summary.edc)}</strong><small className="exact">ยอดจริง ฿{money(data.summary.edc)}</small><small>42.43% ของเงินเข้าทั้งหมด</small></button>
     </section>
 
     <section className="dashboardGrid" id="composition">
@@ -92,6 +92,12 @@ export default function Home() {
     <section className="panel bankOverview" id="banks">
       <div className="panelHead"><div><p className="eyebrow">BANK TRANSFER OVERVIEW</p><h2>สรุปการโอนเข้า–โอนออก แยกตามธนาคาร</h2><p className="muted">จัดกลุ่มจากรหัสธนาคารและช่องทางที่แสดงใน Statement พร้อมยอดเต็ม จำนวนรายการ และสัดส่วน</p></div><div className="bankNet"><span>เงินโอนสุทธิ</span><strong className="negative">฿{compact(transferIn-transferOut)}</strong><small>รับ ฿{money(transferIn)} − โอนออก ฿{money(transferOut)}</small></div></div>
       <div className="bankOverviewGrid"><article><div className="bankColumnHead"><div><span className="typeIn">เงินโอนเข้า</span><h3>รับเข้าจากธนาคารใด</h3></div><div><strong>฿{compact(transferIn)}</strong><small>ยอดจริง ฿{money(transferIn)}</small></div></div><div className="mainBankRows">{bankIn.map((b,i)=><div key={b.name}><span className="bankNumber">{i+1}</span><span><b>{b.name}</b><small>{b.count.toLocaleString("th-TH")} รายการ</small></span><strong>฿{compact(b.amount)}<small>฿{money(b.amount)}</small></strong><em>{(b.amount/transferIn*100).toFixed(1)}%</em></div>)}</div></article><article><div className="bankColumnHead"><div><span className="typeOut">เงินโอนออก</span><h3>ส่งออกไปธนาคารใด</h3></div><div><strong className="negative">฿{compact(transferOut)}</strong><small>ยอดจริง ฿{money(transferOut)}</small></div></div><div className="mainBankRows outgoing">{bankOut.map((b,i)=><div key={b.name}><span className="bankNumber">{i+1}</span><span><b>{b.name}</b><small>{b.count.toLocaleString("th-TH")} รายการ</small></span><strong className="negative">฿{compact(b.amount)}<small>฿{money(b.amount)}</small></strong><em>{(b.amount/transferOut*100).toFixed(1)}%</em></div>)}</div></article></div>
+    </section>
+
+    <section className="panel depositOnly" id="deposits">
+      <div className="depositHeader"><div><p className="eyebrow">DEPOSIT SUMMARY ONLY</p><h2>สรุปเงินฝากและเงินเข้าทั้งหมดในรอบบัญชี</h2><p className="muted">รวมเฉพาะรายการที่เพิ่มยอดเงินในบัญชี ตั้งแต่ 1 มกราคม ถึง 30 มิถุนายน 2569</p></div><div><span>ยอดเงินฝาก/เงินเข้ารวม</span><strong>฿{compact(data.summary.totalIn)}</strong><small>ยอดจริง ฿{money(data.summary.totalIn)} · 3,625 รายการ</small></div></div>
+      <div className="depositGrid">{income.slice().sort((a,b)=>b.amount-a.amount).map((c,i)=><article key={c.category}><span className="depositIcon" style={{background:colors[i%colors.length]}}>{i+1}</span><div><h3>{c.category}</h3><p>{c.count.toLocaleString("th-TH")} รายการ · {(c.amount/data.summary.totalIn*100).toFixed(2)}% ของเงินเข้าทั้งหมด</p></div><strong>฿{compact(c.amount)}<small>ยอดจริง ฿{money(c.amount)}</small></strong></article>)}</div>
+      <div className="depositNote"><b>คำอธิบาย:</b> “เงินฝาก/เงินเข้า” ในรายงานนี้ประกอบด้วยรับโอน เงินสด เช็ค EDC/QR ยอดขายบัตร ธุรกรรมต่างประเทศ และดอกเบี้ยตามที่ปรากฏใน Statement ไม่ได้หมายถึงรายได้ทางบัญชีทั้งหมด</div>
     </section>
 
     <section className="panel dailyPanel" id="daily">
