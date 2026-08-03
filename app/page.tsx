@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import "./main-v2.css";
 
 type Direction = "in" | "out";
 type Transaction = { date:string; month:number; time:string; description:string; category:string; direction:Direction; amount:number; balance:number; detail:string };
@@ -11,6 +12,7 @@ type Report = { summary:{ opening:number; totalIn:number; totalOut:number; endin
 const colors = ["#e60012", "#202b86", "#f04a56", "#5260b6", "#f3a53b", "#6b7280", "#c8ccd8"];
 const money = (n:number) => new Intl.NumberFormat("th-TH", { minimumFractionDigits:2, maximumFractionDigits:2 }).format(n);
 const compact = (n:number) => Math.abs(n) >= 1e6 ? `${n < 0 ? "−" : ""}${(Math.abs(n)/1e6).toFixed(2)} ล้าน` : money(n);
+const bankLabel=(detail:string,outgoing=false)=>{const d=detail.toUpperCase();if(d.includes("SCBT"))return "ธ.ไทยพาณิชย์เพื่อธุรกิจ (SCBT)";if(d.includes("SCB"))return "ธ.ไทยพาณิชย์ (SCB)";if(d.includes("BBL"))return "ธ.กรุงเทพ (BBL)";if(d.includes("KTB"))return "ธ.กรุงไทย (KTB)";if(d.includes("GSB"))return "ธ.ออมสิน (GSB)";if(d.includes("BAAC"))return "ธ.ก.ส. (BAAC)";if(d.includes("BAY"))return "ธ.กรุงศรีฯ (BAY)";if(d.includes("K PLUS")||d.includes("K BIZ")||d.includes("MAKE BY KBANK")||(outgoing&&d.includes("โอนไป X")))return "ธ.กสิกรไทย (KBank)";return "ธนาคาร/ช่องทางอื่น"};
 
 export default function Home() {
   const [data,setData] = useState<Report|null>(null);
@@ -45,6 +47,9 @@ export default function Home() {
   const dailyOut = dailyRows.filter(t=>t.direction==="out").reduce((s,t)=>s+t.amount,0);
   const dailyBalance = dailyRows.at(-1)?.balance ?? 0;
   const dailyCats = Object.values(dailyRows.reduce<Record<string,Category>>((acc,t)=>{const k=`${t.direction}-${t.category}`;acc[k]??={direction:t.direction,category:t.category,count:0,amount:0};acc[k].count++;acc[k].amount+=t.amount;return acc},{})).sort((a,b)=>b.amount-a.amount);
+  const bankSummary=(dir:Direction)=>Object.values(data.transactions.filter(t=>dir==="in"?t.category==="รับโอนเงิน":t.category==="โอนเงินออก").reduce<Record<string,{name:string;amount:number;count:number}>>((acc,t)=>{const name=bankLabel(t.detail,dir==="out");acc[name]??={name,amount:0,count:0};acc[name].amount+=t.amount;acc[name].count++;return acc},{})).sort((a,b)=>b.amount-a.amount);
+  const bankIn=bankSummary("in"),bankOut=bankSummary("out");
+  const transferIn=bankIn.reduce((s,b)=>s+b.amount,0),transferOut=bankOut.reduce((s,b)=>s+b.amount,0);
   const donut = (items:Category[], total:number) => {
     let cursor=0; return `conic-gradient(${items.map((c,i)=>{const start=cursor;cursor+=c.amount/total*100;return `${colors[i%colors.length]} ${start}% ${cursor}%`}).join(",")})`;
   };
@@ -53,7 +58,7 @@ export default function Home() {
   return <main>
     <header className="topbar">
       <div className="brand"><img className="brandLogo" src="/sangchai-logo.jpeg" alt="Sangchai Panich Parts Chiangmai"/><div><strong>แสงชัยพาณิชย์</strong><small>รายงานวิเคราะห์บัญชี</small></div></div>
-      <nav><a className="executiveLink" href="/executive">สรุปผู้บริหาร 1 หน้า</a><a href="#overview">ภาพรวม</a><a href="#composition">สัดส่วน</a><a href="#daily">รายวัน</a><a href="#transactions">รายการเดินบัญชี</a></nav>
+      <nav><a className="executiveLink" href="/executive">สรุปผู้บริหาร 1 หน้า</a><a href="#overview">ภาพรวม</a><a href="#composition">สัดส่วน</a><a href="#banks">ธนาคาร</a><a href="#daily">รายวัน</a><a href="#transactions">รายการเดินบัญชี</a></nav>
       <div className="period">1 ม.ค. – 30 มิ.ย. 2569</div>
     </header>
 
@@ -82,6 +87,11 @@ export default function Home() {
         <button className="donutWrap" onClick={()=>setExpanded("income")} aria-label="ขยายกราฟสัดส่วนเงินเข้า"><span className="donut" style={{background:donut(income,incomeTotal)}}><span><b>฿179.60 ล้าน</b><small>฿{money(incomeTotal)}</small></span></span></button>
         <div className="categoryList">{income.slice().sort((a,b)=>b.amount-a.amount).map((c,i)=><button key={c.category} onClick={()=>selectCategory(c)}><i style={{background:colors[i%colors.length]}}/><span>{c.category}<small>{c.count.toLocaleString("th-TH")} รายการ · ฿{money(c.amount)}</small></span><b>{(c.amount/incomeTotal*100).toFixed(1)}%</b></button>)}</div>
       </article>
+    </section>
+
+    <section className="panel bankOverview" id="banks">
+      <div className="panelHead"><div><p className="eyebrow">BANK TRANSFER OVERVIEW</p><h2>สรุปการโอนเข้า–โอนออก แยกตามธนาคาร</h2><p className="muted">จัดกลุ่มจากรหัสธนาคารและช่องทางที่แสดงใน Statement พร้อมยอดเต็ม จำนวนรายการ และสัดส่วน</p></div><div className="bankNet"><span>เงินโอนสุทธิ</span><strong className="negative">฿{compact(transferIn-transferOut)}</strong><small>รับ ฿{money(transferIn)} − โอนออก ฿{money(transferOut)}</small></div></div>
+      <div className="bankOverviewGrid"><article><div className="bankColumnHead"><div><span className="typeIn">เงินโอนเข้า</span><h3>รับเข้าจากธนาคารใด</h3></div><div><strong>฿{compact(transferIn)}</strong><small>ยอดจริง ฿{money(transferIn)}</small></div></div><div className="mainBankRows">{bankIn.map((b,i)=><div key={b.name}><span className="bankNumber">{i+1}</span><span><b>{b.name}</b><small>{b.count.toLocaleString("th-TH")} รายการ</small></span><strong>฿{compact(b.amount)}<small>฿{money(b.amount)}</small></strong><em>{(b.amount/transferIn*100).toFixed(1)}%</em></div>)}</div></article><article><div className="bankColumnHead"><div><span className="typeOut">เงินโอนออก</span><h3>ส่งออกไปธนาคารใด</h3></div><div><strong className="negative">฿{compact(transferOut)}</strong><small>ยอดจริง ฿{money(transferOut)}</small></div></div><div className="mainBankRows outgoing">{bankOut.map((b,i)=><div key={b.name}><span className="bankNumber">{i+1}</span><span><b>{b.name}</b><small>{b.count.toLocaleString("th-TH")} รายการ</small></span><strong className="negative">฿{compact(b.amount)}<small>฿{money(b.amount)}</small></strong><em>{(b.amount/transferOut*100).toFixed(1)}%</em></div>)}</div></article></div>
     </section>
 
     <section className="panel dailyPanel" id="daily">
