@@ -53,7 +53,7 @@ export default function Home() {
   return <main>
     <header className="topbar">
       <div className="brand"><img className="brandLogo" src="/sangchai-logo.jpeg" alt="Sangchai Panich Parts Chiangmai"/><div><strong>แสงชัยพาณิชย์</strong><small>รายงานวิเคราะห์บัญชี</small></div></div>
-      <nav><a href="#overview">ภาพรวม</a><a href="#composition">สัดส่วน</a><a href="#daily">รายวัน</a><a href="#transactions">รายการเดินบัญชี</a></nav>
+      <nav><a className="executiveLink" href="/executive">สรุปผู้บริหาร 1 หน้า</a><a href="#overview">ภาพรวม</a><a href="#composition">สัดส่วน</a><a href="#daily">รายวัน</a><a href="#transactions">รายการเดินบัญชี</a></nav>
       <div className="period">1 ม.ค. – 30 มิ.ย. 2569</div>
     </header>
 
