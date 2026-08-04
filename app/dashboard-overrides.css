@@ -241,6 +241,11 @@
 .outMonthGrid small { color: var(--muted); font-size: 10px; line-height: 1.45; }
 
 .recipientTable { overflow: auto; margin-top: 17px; }
+.recipientPageStatus { margin-top: 15px; padding: 11px 14px; color: #31456c; background: #f2f6fc; border-radius: 9px; font-size: 13px; font-weight: 800; }
+.recipientPagination { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 18px 0 4px; }
+.recipientPagination button { min-height: 40px; padding: 0 16px; border: 1px solid #d8dfeb; border-radius: 9px; color: var(--navy); background: #fff; font-weight: 900; cursor: pointer; }
+.recipientPagination button:disabled { opacity: .35; cursor: default; }
+.recipientPagination span { color: var(--muted); font-size: 13px; font-weight: 800; }
 .recipientTable table { width: 100%; min-width: 940px; border-collapse: collapse; }
 .recipientTable th { padding: 13px 11px; color: var(--muted); background: #f3f5f8; font-size: 13px; text-align: left; }
 .recipientTable td { padding: 15px 11px; border-bottom: 1px solid #edf0f4; font-size: 14px; vertical-align: middle; }
