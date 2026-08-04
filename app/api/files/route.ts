@@ -6,6 +6,9 @@ const seedFiles = [
   ["seed-ktb-pdf", "ktb 0169-0669 0503508000023สรุป.pdf", "KTB", "ม.ค.–มิ.ย. 2569", "2026-01-01", "2026-06-30", "application/pdf"],
   ["seed-ktb-xls", "Historical_SSKBA04973.xls", "KTB", "ม.ค.–มิ.ย. 2569", "2026-01-01", "2026-06-30", "application/vnd.ms-excel"],
   ["seed-ktb-xls-2", "Historical_SSKBA04973_XXX-X-XX125-8_20260803 2.xls", "KTB", "ม.ค.–มิ.ย. 2569", "2026-01-01", "2026-06-30", "application/vnd.ms-excel"],
+  ["seed-kbank-july", "KBNAK 0769 00023.pdf", "KBANK", "ก.ค. 2569", "2026-07-01", "2026-07-31", "application/pdf"],
+  ["seed-bbl-july", "BBL0769.pdf", "BBL", "ก.ค. 2569", "2026-07-01", "2026-07-31", "application/pdf"],
+  ["seed-ktb-july", "KTB 0769 0503508000023.xls", "KTB", "ก.ค. 2569", "2026-07-01", "2026-07-31", "application/vnd.ms-excel"],
 ] as const;
 
 async function ensureDatabase() {
