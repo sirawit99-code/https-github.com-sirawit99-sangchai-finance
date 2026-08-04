@@ -209,6 +209,9 @@
 .outgoingTabs { display: flex; flex-wrap: wrap; gap: 7px; justify-content: end; }
 .outgoingTabs button { padding: 10px 13px; border: 1px solid #ffffff3d; border-radius: 9px; color: #fff; background: #ffffff12; font-weight: 900; cursor: pointer; }
 .outgoingTabs button.active { color: var(--navy); background: #fff; }
+.analysisCompleteness { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin: 14px 0; padding: 14px 18px; border: 1px solid #bed5f3; border-radius: 12px; background: #eef6ff; color: #173b6c; font-size: 15px; line-height: 1.5; }
+.analysisCompleteness b { color: var(--navy); font-size: 19px; }
+.analysisCompleteness span { font-weight: 800; }
 
 .outgoingKpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .outgoingKpis article { padding: 18px 20px; border: 1px solid var(--line); border-top: 4px solid var(--blue); border-radius: 14px; background: #fff; }
@@ -261,6 +264,7 @@
 
 @media (max-width: 680px) {
   .outgoingHero { align-items: flex-start; flex-direction: column; padding: 20px; }
+  .analysisCompleteness { align-items: flex-start; flex-direction: column; gap: 2px; }
   .outgoingTabs { justify-content: start; }
   .outgoingKpis { grid-template-columns: 1fr; }
   .outMonthGrid { grid-template-columns: repeat(2, 1fr); }
