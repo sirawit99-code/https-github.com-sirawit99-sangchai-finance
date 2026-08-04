@@ -2,135 +2,155 @@
 
 import { useEffect, useMemo, useState } from "react";
 import "./main-v2.css";
+import "./dashboard-overrides.css";
 
-type Direction = "in" | "out";
-type Transaction = { date:string; month:number; time:string; description:string; category:string; direction:Direction; amount:number; balance:number; detail:string };
-type Category = { direction:Direction; category:string; count:number; amount:number };
-type Month = { month:string; in:number; out:number; ending:number };
-type Report = { summary:{ opening:number; totalIn:number; totalOut:number; ending:number; net:number; edc:number; period:string; transactions:number }; months:Month[]; categories:Category[]; transactions:Transaction[] };
+type Bank = { bank:string; account:string; opening:number; incoming:number; outgoing:number; ending:number; tax:number; transactions:number; months:{label:string;incoming:number;outgoing:number;ending:number}[] };
+type Txn = { bank:string; date:string; time:string; direction:"in"|"out"; amount:number; description:string };
+type Data = { meta:{entity:string;period:string;generated:string}; banks:Bank[]; combined:{label:string;incoming:number;outgoing:number;net:number;ending:number}[]; totals:{opening:number;incoming:number;outgoing:number;ending:number;tax:number;internal:number;cash:number}; internalTransfers:{date:string;time:string;from:string;to:string;amount:number}[]; cashWithdrawals:{date:string;day:string;time:string;reference:string;amount:number}[]; personTransfers:{date:string;bank:string;direction:"in"|"out";amount:number;counterparty:string;detail:string}[]; alerts:{level:string;title:string;detail:string;action:string}[]; quality:{label:string;status:string;detail:string}[]; transactions:Txn[] };
+type OutgoingGroup = { bank:string; name:string; category:string; amount:number; count:number; months:Record<string,{amount:number;count:number}>; identified:boolean };
 
-const colors = ["#e60012", "#202b86", "#f04a56", "#5260b6", "#f3a53b", "#6b7280", "#c8ccd8"];
-const money = (n:number) => new Intl.NumberFormat("th-TH", { minimumFractionDigits:2, maximumFractionDigits:2 }).format(n);
-const compact = (n:number) => Math.abs(n) >= 1e6 ? `${n < 0 ? "−" : ""}${(Math.abs(n)/1e6).toFixed(2)} ล้าน` : money(n);
-const bankLabel=(detail:string,outgoing=false)=>{const d=detail.toUpperCase();if(d.includes("SCBT"))return "ธ.ไทยพาณิชย์เพื่อธุรกิจ (SCBT)";if(d.includes("SCB"))return "ธ.ไทยพาณิชย์ (SCB)";if(d.includes("BBL"))return "ธ.กรุงเทพ (BBL)";if(d.includes("KTB"))return "ธ.กรุงไทย (KTB)";if(d.includes("GSB"))return "ธ.ออมสิน (GSB)";if(d.includes("BAAC"))return "ธ.ก.ส. (BAAC)";if(d.includes("BAY"))return "ธ.กรุงศรีฯ (BAY)";if(d.includes("K PLUS")||d.includes("K BIZ")||d.includes("MAKE BY KBANK")||(outgoing&&d.includes("โอนไป X")))return "ธ.กสิกรไทย (KBank)";return "ธนาคาร/ช่องทางอื่น"};
+const fmt=(n:number)=>new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+const short=(n:number)=>`${(Math.abs(n)/1e6).toFixed(2)} ลบ.`;
+const bankColor:Record<string,string>={KBANK:"#239a60",BBL:"#254aa5",KTB:"#0aa8d6"};
+const monthNames:Record<string,string>={"01":"ม.ค.","02":"ก.พ.","03":"มี.ค.","04":"เม.ย.","05":"พ.ค.","06":"มิ.ย."};
 
-export default function Home() {
-  const [data,setData] = useState<Report|null>(null);
-  const [direction,setDirection] = useState<"all"|Direction>("all");
-  const [category,setCategory] = useState("all");
-  const [month,setMonth] = useState(0);
-  const [query,setQuery] = useState("");
-  const [page,setPage] = useState(1);
-  const [expanded,setExpanded] = useState<null|"income"|"outcome"|"monthly">(null);
-  const [selectedDate,setSelectedDate] = useState("30-06-26");
+function outgoingIdentity(t:Txn){
+  const d=t.description.replace(/\+\+$/g,"").trim();
+  if(t.bank==="KBANK"){
+    if(d.includes("สาขาถนนท่าแพ"))return {name:"ถอนเงินสดผ่านสาขา",category:"ถอนเงินสด",identified:false};
+    let name=d.replace(/^K BIZ (?:โอนไป|เพื่อชำระ)\s*/i,"").replace(/^(?:KBANK|BBL|KTB|SCB|SCBT|UOBT|BAY|TTB)\s+/i,"").replace(/^(?:Ref\s+)?X\d+\s*/i,"").trim();
+    if(name&&name!==d){
+      const internal=/แสงชัยพาณิช/i.test(name);
+      const person=/^(?:นาย|นาง|น\.ส\.|นางสาว)|Pongsak|Somchai/i.test(name);
+      return {name,category:internal?"โอนภายใน":person?"บุคคล":"คู่ค้า/บริษัท",identified:true};
+    }
+  }
+  if(t.bank==="BBL"){
+    const rules:[RegExp,string,string][]=[[/^Payroll/i,"เงินเดือน (ไม่ระบุรายชื่อ)","เงินเดือน"],[/^PAYMENT ON GOODS/i,"ชำระค่าสินค้า (ไม่ระบุคู่ค้า)","คู่ค้า/สินค้า"],[/^BAHTNET/i,"โอน BAHTNET (ไม่ระบุผู้รับ)","โอนเงิน"],[/^AMOUNT/i,"โอนบัญชี (ไม่ระบุผู้รับ)","โอนเงิน"],[/^ELECTRIC/i,"ค่าไฟฟ้า","สาธารณูปโภค"],[/^COM\.|^Fees|^Service Fee|^STAMP/i,"ค่าธรรมเนียมธนาคาร","ค่าธรรมเนียม"],[/^TAXES/i,"ภาษี","ภาษี"],[/^SMART/i,"ถอน/โอน SMART ผ่านสาขา","ถอน/โอนผ่านสาขา"]];
+    const found=rules.find(([re])=>re.test(d)); if(found)return {name:found[1],category:found[2],identified:false};
+  }
+  if(t.bank==="KTB"){
+    let name="";
+    const transfer=d.match(/(?:TR to)\s+\d+\s+(.+?)(?=\s+(?:20\d{12,}|[\d,]+\.\d{2}\s+0\.00|Krungthai|KTB netbank|-$))/i);
+    if(transfer)name=transfer[1].trim();
+    if(!name){
+      const cleaned=d.replace(/^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}\s+/,"").replace(/^(?:PORPSW|PMOPSW|PMOWSW|PBSWP|PBSWT|PBPSWP|NMPSWP)\s+/i,"").replace(/^\S+\s+\S+\s+/,"");
+      name=cleaned.split(/\s+(?:20\d{12,}|[\d,]+\.\d{2}\s+0\.00|Krungthai|KTB netbank|-)\b/i)[0].trim();
+    }
+    if(name&&name.length>2){
+      const internal=/Sangchai Phanich/i.test(name), person=!/(?:CO\.|LTD|PCL|บริษัท|บจก|บมจ|หจก|Marketing|Rubber|Motul|GASKET|AIA|WUERTH|Municipality|DEPARTMENT)/i.test(name);
+      return {name,category:internal?"โอนภายใน":person?"บุคคล":"คู่ค้า/บริษัท",identified:true};
+    }
+  }
+  return {name:"ไม่ระบุชื่อผู้รับใน Statement",category:"รอตรวจเอกสาร",identified:false};
+}
 
-  useEffect(()=>{ fetch("/sangchai-report-data.json").then(r=>r.json()).then(setData); },[]);
-  useEffect(()=>setPage(1),[direction,category,month,query]);
+function incomingIdentity(t:Txn){
+  const d=t.description.replace(/\+\+$/g,"").trim();
+  if(t.bank==="KBANK"){
+    if(/EDC\/K SHOP\/MYQR|401014604133001 SANGCHAI/i.test(d))return {name:"ยอดขาย EDC / QR แสงชัยพาณิชย์",category:"EDC / QR",identified:false};
+    if(d.includes("สาขาถนนท่าแพ"))return {name:"ฝากเงินผ่านสาขาถนนท่าแพ",category:"ฝากเงินสด/เช็ค",identified:false};
+    let name=d.split(/\sจาก\s/i).slice(1).join(" จาก ").replace(/^(?:KBANK|BBL|KTB|SCB|SCBT|UOBT|BAY|TTB|SMART BBL)\s+/i,"").replace(/^X\d+\s*/i,"").trim();
+    if(name){const internal=/SANGCHAI|แสงชัยพาณิช/i.test(name),person=/^(?:นาย|นาง|น\.ส\.|นางสาว|MR\.|MS\.|MRS\.)/i.test(name);return {name,category:internal?"โอนภายใน":person?"บุคคล":"ลูกค้า/บริษัท",identified:true}}
+  }
+  if(t.bank==="BBL"){
+    if(/^TRF FR OTH BK/i.test(d))return {name:"โอนจากต่างธนาคาร (ไม่ระบุชื่อ)",category:"โอนเข้า",identified:false};
+    if(/^Bill Deposit/i.test(d))return {name:"Bill Deposit (ไม่ระบุชื่อ)",category:"รับชำระบิล",identified:false};
+    if(/^AMOUNT/i.test(d))return {name:"โอนเข้าบัญชี (ไม่ระบุชื่อ)",category:"โอนเข้า",identified:false};
+    if(/Cash Deposit|CASH DEP/i.test(d))return {name:"ฝากเงินสด (ไม่ระบุผู้นำฝาก)",category:"ฝากเงินสด",identified:false};
+    return {name:"เงินเข้า BBL ไม่ระบุผู้ส่ง",category:"รอตรวจเอกสาร",identified:false};
+  }
+  if(t.bank==="KTB"){
+    const mobile=d.match(/MORPSD\s+([\d-]+)/i); if(mobile)return {name:`บัญชีต่างธนาคาร ${mobile[1]}`,category:"Mobile Banking",identified:true};
+    if(/NMPSDP/i.test(d))return {name:"รับชำระผ่าน KTB Netbank",category:"รับชำระ/ฝาก",identified:false};
+    if(/SDCK/i.test(d))return {name:"เช็ครับฝาก SDCK",category:"ฝากเช็ค",identified:false};
+    if(/SDCH/i.test(d))return {name:"เช็ครับฝาก SDCH",category:"ฝากเช็ค",identified:false};
+  }
+  return {name:"ไม่ระบุชื่อผู้ส่งใน Statement",category:"รอตรวจเอกสาร",identified:false};
+}
 
-  const rows = useMemo(()=>data?.transactions.filter(t =>
-    (direction === "all" || t.direction === direction) &&
-    (category === "all" || t.category === category) &&
-    (!month || t.month === month) &&
-    (!query || `${t.date} ${t.time} ${t.description} ${t.detail}`.toLowerCase().includes(query.toLowerCase()))
-  ) ?? [],[data,direction,category,month,query]);
+export default function Home(){
+  const [data,setData]=useState<Data|null>(null);
+  const [view,setView]=useState<"overview"|"incoming"|"outgoing"|"transactions"|"audit">("overview");
+  const [bank,setBank]=useState("all");
+  const [month,setMonth]=useState("all");
+  const [direction,setDirection]=useState("all");
+  const [query,setQuery]=useState("");
+  const [page,setPage]=useState(1);
+  const [selectedBank,setSelectedBank]=useState("all");
+  const [outgoingBank,setOutgoingBank]=useState("all");
+  const [incomingBank,setIncomingBank]=useState("all");
+  const [refreshState,setRefreshState]=useState<"idle"|"loading"|"done"|"error">("idle");
+  const [updatedAt,setUpdatedAt]=useState("");
+  const [notice,setNotice]=useState("");
+  async function refreshDashboard(manual=false){
+    setRefreshState("loading");
+    try{
+      const response=await fetch(`/dashboard-data.json?v=${Date.now()}`,{cache:"no-store"});
+      if(!response.ok)throw new Error("โหลดข้อมูลไม่สำเร็จ");
+      const next=await response.json() as Data;
+      setData(next);
+      setUpdatedAt(new Date().toLocaleString("th-TH",{dateStyle:"short",timeStyle:"short"}));
+      setRefreshState("done");
+      if(manual){setNotice("อัปเดตข้อมูล Dashboard เรียบร้อยแล้ว");window.setTimeout(()=>setNotice(""),3500)}
+    }catch{
+      setRefreshState("error");
+      if(manual){setNotice("อัปเดตไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");window.setTimeout(()=>setNotice(""),4500)}
+    }
+  }
+  // Load the latest published dashboard snapshot on first render.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(()=>{void refreshDashboard(false)},[]);
+  // Reset pagination whenever the active transaction query changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(()=>setPage(1),[bank,month,direction,query]);
+  const rows=useMemo(()=>data?.transactions.filter(t=>(bank==="all"||t.bank===bank)&&(direction==="all"||t.direction===direction)&&(month==="all"||t.date.slice(5,7)===month)&&(!query||`${t.date} ${t.time} ${t.description} ${t.amount}`.toLowerCase().includes(query.toLowerCase())))??[],[data,bank,month,direction,query]);
+  const outgoingAnalysis=useMemo(()=>{
+    if(!data)return {groups:[] as OutgoingGroup[],total:0,count:0,identified:0,unidentifiedCount:0,monthly:[] as {month:string;amount:number;count:number;people:number}[]};
+    const txns=data.transactions.filter(t=>t.direction==="out"&&(outgoingBank==="all"||t.bank===outgoingBank));
+    const map=new Map<string,OutgoingGroup>();
+    for(const t of txns){const identity=outgoingIdentity(t),key=`${t.bank}|${identity.name}`,month=t.date.slice(5,7);const g=map.get(key)||{bank:t.bank,name:identity.name,category:identity.category,amount:0,count:0,months:{},identified:identity.identified};g.amount+=t.amount;g.count++;g.months[month]??={amount:0,count:0};g.months[month].amount+=t.amount;g.months[month].count++;map.set(key,g)}
+    const groups=[...map.values()].sort((a,b)=>b.amount-a.amount), monthly=Object.keys(monthNames).map(month=>{const monthRows=txns.filter(t=>t.date.slice(5,7)===month);return {month,amount:monthRows.reduce((s,t)=>s+t.amount,0),count:monthRows.length,people:new Set(monthRows.map(t=>{const x=outgoingIdentity(t);return x.identified?`${t.bank}|${x.name}`:""}).filter(Boolean)).size}});
+    return {groups,total:txns.reduce((s,t)=>s+t.amount,0),count:txns.length,identified:new Set(groups.filter(g=>g.identified).map(g=>`${g.bank}|${g.name}`)).size,unidentifiedCount:groups.filter(g=>!g.identified).reduce((s,g)=>s+g.count,0),monthly};
+  },[data,outgoingBank]);
+  const incomingAnalysis=useMemo(()=>{
+    if(!data)return {groups:[] as OutgoingGroup[],total:0,count:0,identified:0,unidentifiedCount:0,monthly:[] as {month:string;amount:number;count:number;people:number}[]};
+    const txns=data.transactions.filter(t=>t.direction==="in"&&(incomingBank==="all"||t.bank===incomingBank));
+    const map=new Map<string,OutgoingGroup>();
+    for(const t of txns){const identity=incomingIdentity(t),key=`${t.bank}|${identity.name}`,month=t.date.slice(5,7);const g=map.get(key)||{bank:t.bank,name:identity.name,category:identity.category,amount:0,count:0,months:{},identified:identity.identified};g.amount+=t.amount;g.count++;g.months[month]??={amount:0,count:0};g.months[month].amount+=t.amount;g.months[month].count++;map.set(key,g)}
+    const groups=[...map.values()].sort((a,b)=>b.amount-a.amount),monthly=Object.keys(monthNames).map(month=>{const monthRows=txns.filter(t=>t.date.slice(5,7)===month);return {month,amount:monthRows.reduce((s,t)=>s+t.amount,0),count:monthRows.length,people:new Set(monthRows.map(t=>{const x=incomingIdentity(t);return x.identified?`${t.bank}|${x.name}`:""}).filter(Boolean)).size}});
+    return {groups,total:txns.reduce((s,t)=>s+t.amount,0),count:txns.length,identified:new Set(groups.filter(g=>g.identified).map(g=>`${g.bank}|${g.name}`)).size,unidentifiedCount:groups.filter(g=>!g.identified).reduce((s,g)=>s+g.count,0),monthly};
+  },[data,incomingBank]);
+  if(!data)return <main className="appLoading"><div className="loader"/><b>กำลังจัดเตรียม Dashboard…</b></main>;
+  const t=data.totals, change=t.ending-t.opening, maxMonth=Math.max(...data.combined.flatMap(m=>[m.incoming,m.outgoing]));
+  const comparedBanks=selectedBank==="all"?data.banks:data.banks.filter(b=>b.bank===selectedBank);
+  const maxBankFlow=Math.max(...data.banks.flatMap(b=>[b.incoming,b.outgoing]));
+  const pageSize=40,pages=Math.max(1,Math.ceil(rows.length/pageSize)),shown=rows.slice((page-1)*pageSize,page*pageSize);
+  const nav=(key:typeof view,label:string,icon:string)=><button className={view===key?"active":""} onClick={()=>setView(key)}><i>{icon}</i><span>{label}</span></button>;
+  return <main className="dashboardApp">
+    <aside className="sideNav"><div className="sideBrand"><img src="/sangchai-logo.jpeg" alt="แสงชัยพาณิชย์"/><div><b>FINANCE</b><small>CONTROL CENTER</small></div></div><nav>{nav("overview","ภาพรวมผู้บริหาร","◫")}{nav("incoming","วิเคราะห์เงินขาเข้า","↙")}{nav("outgoing","วิเคราะห์เงินขาออก","↗")}{nav("transactions","ค้นหารายการ","⌕")}{nav("audit","ศูนย์ตรวจสอบ","✓")}<a href="/files"><i>⇧</i><span>คลังไฟล์</span></a></nav><div className="sideInfo"><span>รอบข้อมูล</span><b>ม.ค.–มิ.ย. 2569</b><small>3 ธนาคาร · 12,441 รายการ</small></div></aside>
+    <section className="workspace"><header className="appHeader"><div><p>{data.meta.entity}</p><h1>{view==="overview"?"ภาพรวมการเงิน 3 ธนาคาร":view==="incoming"?"วิเคราะห์เงินขาเข้าและแหล่งที่มา":view==="outgoing"?"วิเคราะห์เงินขาออกและคู่ค้า":view==="transactions"?"ค้นหาและตรวจสอบรายการ":"ศูนย์ควบคุมและตรวจสอบข้อมูล"}</h1></div><div className="headerTools"><span className="health"><i/>ข้อมูลหลักกระทบยอดแล้ว</span><span className={`refreshStatus ${refreshState}`}>{refreshState==="loading"?"กำลังอัปเดต…":refreshState==="error"?"อัปเดตไม่สำเร็จ":updatedAt?`ล่าสุด ${updatedAt}`:"พร้อมอัปเดต"}</span><button className="refreshButton" disabled={refreshState==="loading"} onClick={()=>void refreshDashboard(true)}>↻ อัปเดตข้อมูล</button><a className="pdfDownload" href="/sangchai-finance-dashboard.pdf" download="รายงานสรุปการเงิน-3-ธนาคาร.pdf">↓ ดาวน์โหลด PDF</a></div></header>{notice&&<div className={`dashboardNotice ${refreshState==="error"?"error":""}`} role="status">{refreshState==="error"?"!":"✓"} {notice}</div>}
 
-  if (!data) return <main className="loading"><div className="pulse"/><p>กำลังจัดเตรียมรายงานบัญชี…</p></main>;
-  const income = data.categories.filter(c=>c.direction==="in");
-  const outcome = data.categories.filter(c=>c.direction==="out");
-  const incomeTotal = income.reduce((s,c)=>s+c.amount,0);
-  const maxMonth = Math.max(...data.months.flatMap(m=>[m.in,m.out]));
-  const pageSize = 30, pageCount = Math.ceil(rows.length/pageSize), shown = rows.slice((page-1)*pageSize,page*pageSize);
-  const catOptions = data.categories.filter(c=>direction==="all" || c.direction===direction);
-  const dates = [...new Set(data.transactions.map(t=>t.date))];
-  const dailyRows = data.transactions.filter(t=>t.date===selectedDate);
-  const dailyIn = dailyRows.filter(t=>t.direction==="in").reduce((s,t)=>s+t.amount,0);
-  const dailyOut = dailyRows.filter(t=>t.direction==="out").reduce((s,t)=>s+t.amount,0);
-  const dailyBalance = dailyRows.at(-1)?.balance ?? 0;
-  const dailyCats = Object.values(dailyRows.reduce<Record<string,Category>>((acc,t)=>{const k=`${t.direction}-${t.category}`;acc[k]??={direction:t.direction,category:t.category,count:0,amount:0};acc[k].count++;acc[k].amount+=t.amount;return acc},{})).sort((a,b)=>b.amount-a.amount);
-  const bankSummary=(dir:Direction)=>Object.values(data.transactions.filter(t=>dir==="in"?t.category==="รับโอนเงิน":t.category==="โอนเงินออก").reduce<Record<string,{name:string;amount:number;count:number}>>((acc,t)=>{const name=bankLabel(t.detail,dir==="out");acc[name]??={name,amount:0,count:0};acc[name].amount+=t.amount;acc[name].count++;return acc},{})).sort((a,b)=>b.amount-a.amount);
-  const bankIn=bankSummary("in"),bankOut=bankSummary("out");
-  const transferIn=bankIn.reduce((s,b)=>s+b.amount,0),transferOut=bankOut.reduce((s,b)=>s+b.amount,0);
-  const donut = (items:Category[], total:number) => {
-    let cursor=0; return `conic-gradient(${items.map((c,i)=>{const start=cursor;cursor+=c.amount/total*100;return `${colors[i%colors.length]} ${start}% ${cursor}%`}).join(",")})`;
-  };
-  const selectCategory = (c:Category) => { setDirection(c.direction); setCategory(c.category); document.getElementById("deposits")?.scrollIntoView({behavior:"smooth"}); };
+    {view==="overview"&&<><section className="summaryStrip"><article className="primaryKpi"><span>เงินคงเหลือรวม 30 มิ.ย.</span><strong>฿{fmt(t.ending)}</strong><small>ต้นงวด ฿{fmt(t.opening)}</small></article><article><span>เงินเข้ารวม</span><strong className="blue">฿{short(t.incoming)}</strong><small>ยอดจริง {fmt(t.incoming)} บาท</small></article><article><span>เงินออกรวม</span><strong className="red">฿{short(t.outgoing)}</strong><small>ยอดจริง {fmt(t.outgoing)} บาท</small></article><article><span>ยอดคงเหลือเปลี่ยนแปลง</span><strong className="red">−฿{short(Math.abs(change))}</strong><small>ลดลง {Math.abs(change/t.opening*100).toFixed(2)}%</small></article></section>
+    <section className="overviewGrid"><article className="surface chartSurface"><div className="sectionHead"><div><p>MONTHLY CASH MOVEMENT</p><h2>เงินเข้า–ออก และยอดคงเหลือรายเดือน</h2></div><div className="chartKey"><span><i className="in"/>เงินเข้า</span><span><i className="out"/>เงินออก</span></div></div><div className="monthBars">{data.combined.map(m=><div className="monthGroup" key={m.label}><div className="bars"><i className="incoming" style={{height:`${m.incoming/maxMonth*100}%`}} title={`เงินเข้า ${fmt(m.incoming)}`}/><i className="outgoing" style={{height:`${m.outgoing/maxMonth*100}%`}} title={`เงินออก ${fmt(m.outgoing)}`}/></div><b>{m.label}</b><span className={m.net>=0?"up":"down"}>{m.net>=0?"+":"−"}{short(Math.abs(m.net))}</span><small>เหลือ {short(m.ending)}</small></div>)}</div></article>
+    <article className="surface attentionSurface"><div className="sectionHead"><div><p>MANAGEMENT ATTENTION</p><h2>รายการที่ควรดำเนินการ</h2></div><span className="alertCount">{data.alerts.length} เรื่อง</span></div><div className="alertList">{data.alerts.map((a,i)=><article key={a.title} className={a.level}><span>{i+1}</span><div><b>{a.title}</b><p>{a.detail}</p><small>ควรทำ: {a.action}</small></div></article>)}</div></article></section>
+    <section className="surface bankSurface"><div className="sectionHead"><div><p>BANK POSITION</p><h2>กดเลือกธนาคารเพื่อดูเงินเข้า–ออก</h2></div><button className="compareAll" onClick={()=>setSelectedBank("all")}>เปรียบเทียบทั้ง 3 ธนาคาร</button></div><div className="bankCards">{data.banks.map(b=>{const delta=b.ending-b.opening;return <article className={selectedBank===b.bank?"selected":""} key={b.bank} style={{"--bank":bankColor[b.bank]} as React.CSSProperties} onClick={()=>setSelectedBank(b.bank)}><button className="bankSelect" aria-pressed={selectedBank===b.bank} onClick={()=>setSelectedBank(b.bank)}><div className="bankTitle"><i/><div><b>{b.bank}</b><small>{b.account}</small></div><em>{selectedBank===b.bank?"กำลังแสดง":"กดดูรายละเอียด"}</em></div><div className="bankBalance"><span>ปลายงวด</span><strong>฿{fmt(b.ending)}</strong></div><div className="bankStats"><span>ต้นงวด<b>{fmt(b.opening)}</b></span><span>เงินเข้า<b>{fmt(b.incoming)}</b></span><span>เงินออก<b>{fmt(b.outgoing)}</b></span></div><div className="bankDelta"><span>เปลี่ยนแปลง</span><b className="red">−฿{fmt(Math.abs(delta))}</b><small>ลดลง {Math.abs(delta/b.opening*100).toFixed(2)}%</small></div></button></article>})}</div>
+    <div className="bankComparison"><div className="comparisonHead"><div><p>IN / OUT COMPARISON</p><h3>{selectedBank==="all"?"เปรียบเทียบเงินเข้า–ออกทั้ง 3 ธนาคาร":`รายละเอียดเงินเข้า–ออก ${selectedBank}`}</h3></div><div className="comparisonTabs"><button className={selectedBank==="all"?"active":""} onClick={()=>setSelectedBank("all")}>ทั้งหมด</button>{data.banks.map(b=><button className={selectedBank===b.bank?"active":""} key={b.bank} onClick={()=>setSelectedBank(b.bank)}>{b.bank}</button>)}</div></div><div className={`comparisonRows ${selectedBank!=="all"?"single":""}`}>{comparedBanks.map(b=>{const net=b.incoming-b.outgoing;return <article key={b.bank} style={{"--bank":bankColor[b.bank]} as React.CSSProperties}><header><span><i/>{b.bank}<small>{b.account}</small></span><strong className={net>=0?"up":"red"}>{net>=0?"+":"−"}฿{fmt(Math.abs(net))}</strong></header><div className="flowCompare"><div><span>เงินเข้า</span><b className="blue">฿{fmt(b.incoming)}</b><i><em style={{width:`${b.incoming/maxBankFlow*100}%`}}/></i></div><div><span>เงินออก</span><b className="red">฿{fmt(b.outgoing)}</b><i><em style={{width:`${b.outgoing/maxBankFlow*100}%`}}/></i></div></div><footer><span>ยอดปลายงวด <b>฿{fmt(b.ending)}</b></span><span>{b.transactions.toLocaleString("th-TH")} รายการ</span></footer></article>})}</div></div></section>
+    <section className="controlGrid"><article className="surface internalCard"><div className="sectionHead"><div><p>INTERNAL TRANSFER</p><h2>การโยกเงินระหว่าง 3 บัญชี</h2></div><b>฿{fmt(t.internal)}</b></div><div className="route"><span>KTB</span><i>5 รายการ →</i><span>KBANK</span></div><p>จับคู่วันที่ เวลา จำนวนเงิน และชื่อบัญชีตรงกันครบ ควรตัดออกทั้งฝั่งเงินเข้าและเงินออกเมื่อต้องการวิเคราะห์กระแสเงินภายนอก</p></article><article className="surface controlCard"><div className="sectionHead"><div><p>CONTROL STATUS</p><h2>สถานะคุณภาพข้อมูล</h2></div></div>{data.quality.map(q=><div className="qualityRow" key={q.label}><i className={q.status}>{q.status==="pass"?"✓":"!"}</i><span><b>{q.label}</b><small>{q.detail}</small></span></div>)}</article></section></>}
 
-  return <main>
-    <header className="topbar">
-      <div className="brand"><img className="brandLogo" src="/sangchai-logo.jpeg" alt="Sangchai Panich Parts Chiangmai"/><div><strong>KBANK 1-6/69</strong><small>สรุปรอบบัญชี แสงชัยพาณิชย์</small></div></div>
-      <nav><a className="executiveLink" href="/executive">สรุปผู้บริหาร 1 หน้า</a><a href="#overview">ภาพรวม</a><a href="#deposits">เงินฝาก</a><a href="#banks">ธนาคาร</a></nav>
-      <div className="period">1 ม.ค. – 30 มิ.ย. 2569</div>
-    </header>
+    {view==="outgoing"&&<section className="outgoingPage"><div className="outgoingHero"><div><p>OUTGOING ANALYSIS · 3 BANKS</p><h2>เงินขาออกไปที่ใคร มากน้อยเพียงใด</h2><span>สรุปจากรายการเงินออกใน Statement ระหว่าง ม.ค.–มิ.ย. 2569</span></div><div className="outgoingTabs"><button className={outgoingBank==="all"?"active":""} onClick={()=>setOutgoingBank("all")}>รวม 3 ธนาคาร</button>{data.banks.map(b=><button key={b.bank} className={outgoingBank===b.bank?"active":""} onClick={()=>setOutgoingBank(b.bank)}>{b.bank}</button>)}</div></div>
+    <div className="outgoingKpis"><article><span>ยอดเงินขาออก</span><strong className="red">฿{short(outgoingAnalysis.total)}</strong><small>{fmt(outgoingAnalysis.total)} บาท</small></article><article><span>จำนวนรายการ</span><strong>{outgoingAnalysis.count.toLocaleString("th-TH")}</strong><small>เฉลี่ย ฿{fmt(outgoingAnalysis.total/Math.max(outgoingAnalysis.count,1))} ต่อครั้ง</small></article><article><span>ผู้รับที่ระบุชื่อได้</span><strong>{outgoingAnalysis.identified.toLocaleString("th-TH")}</strong><small>ราย/นิติบุคคล แยกตามชื่อและธนาคาร</small></article><article><span>รายการไม่ระบุชื่อ</span><strong className="warnText">{outgoingAnalysis.unidentifiedCount.toLocaleString("th-TH")}</strong><small>ต้องใช้เอกสารเพิ่มเพื่อยืนยันผู้รับ</small></article></div>
+    <article className="surface monthlyOutgoing"><div className="sectionHead"><div><p>MONTHLY OUTGOING</p><h2>แต่ละเดือนออกกี่ครั้ง กี่คน</h2></div><b>เลือก: {outgoingBank==="all"?"รวม 3 ธนาคาร":outgoingBank}</b></div><div className="outMonthGrid">{outgoingAnalysis.monthly.map(m=><div key={m.month}><span>{monthNames[m.month]}</span><strong>฿{short(m.amount)}</strong><small>{m.count.toLocaleString("th-TH")} ครั้ง · ระบุผู้รับได้ {m.people.toLocaleString("th-TH")} ราย</small></div>)}</div></article>
+    <article className="surface recipientSurface"><div className="sectionHead"><div><p>RECIPIENT & VENDOR CONCENTRATION</p><h2>ผู้รับเงิน คู่ค้า และสัดส่วนเงินออก</h2><span className="muted">เปอร์เซ็นต์คำนวณจากยอดเงินออกของตัวเลือกปัจจุบัน</span></div><b>{outgoingAnalysis.groups.length.toLocaleString("th-TH")} กลุ่มผู้รับ</b></div><div className="recipientTable"><table><thead><tr><th>ธนาคาร</th><th>ชื่อผู้รับ / กลุ่มรายการ</th><th>ประเภท</th><th className="number">จำนวนครั้ง</th><th className="number">ยอดรวม</th><th className="number">สัดส่วน</th></tr></thead><tbody>{outgoingAnalysis.groups.map(g=><tr key={`${g.bank}-${g.name}`}><td><span className="bankPill" style={{borderColor:bankColor[g.bank]}}>{g.bank}</span></td><td><b>{g.name}</b><small>{Object.entries(g.months).map(([m,v])=>`${monthNames[m]} ${v.count} ครั้ง`).join(" · ")}</small></td><td><span className={`categoryPill ${g.identified?"":"unverified"}`}>{g.category}</span></td><td className="number">{g.count.toLocaleString("th-TH")}</td><td className="number red">฿{fmt(g.amount)}</td><td className="number"><b>{(g.amount/Math.max(outgoingAnalysis.total,1)*100).toFixed(2)}%</b><i className="shareBar"><em style={{width:`${Math.min(100,g.amount/Math.max(outgoingAnalysis.total,1)*100)}%`}}/></i></td></tr>)}</tbody></table></div><div className="evidenceNote"><b>วิธีอ่านและข้อจำกัด</b><p>จำนวน “ผู้รับที่ระบุชื่อได้” นับชื่อแยกตามธนาคาร ไม่ได้สรุปว่าเป็นบุคคลเดียวกันข้ามบัญชี รายการ BBL หลายรายการไม่มีชื่อคู่ค้าใน Statement จึงรวมตามประเภทรายการและแสดงสถานะรอตรวจเอกสาร โดยไม่มีการเดาชื่อผู้รับ</p></div></article></section>}
 
-    <section className="hero" id="overview">
-      <div><p className="eyebrow">KBANK 1-6/69 · บัญชีออมทรัพย์ •••• 3518</p><h1>สรุปรอบบัญชี<br/>มกราคม–มิถุนายน 2569</h1><p className="lead">แสดงเฉพาะภาพรวม ยอดเงินฝาก และการโอนแยกตามธนาคาร โดยตัดรายละเอียดรายการเดินบัญชีรายรายการออกแล้ว</p></div>
-      <div className="balanceCard"><span>ยอดคงเหลือ ณ 30 มิ.ย. 2569</span><strong>฿{compact(data.summary.ending)}</strong><small className="exactLight">ยอดจริง ฿{money(data.summary.ending)}</small><div className="balanceMeta"><span>ต้นงวด ฿{money(data.summary.opening)}</span><b>เปลี่ยนแปลง {money(data.summary.net)} บาท</b></div></div>
-    </section>
+    {view==="incoming"&&<section className="outgoingPage incomingPage"><div className="outgoingHero incomingHero"><div><p>INCOMING ANALYSIS · 3 BANKS</p><h2>เงินขาเข้ามาจากใคร และช่องทางใด</h2><span>สรุปจากรายการเงินเข้าใน Statement ระหว่าง ม.ค.–มิ.ย. 2569</span></div><div className="outgoingTabs"><button className={incomingBank==="all"?"active":""} onClick={()=>setIncomingBank("all")}>รวม 3 ธนาคาร</button>{data.banks.map(b=><button key={b.bank} className={incomingBank===b.bank?"active":""} onClick={()=>setIncomingBank(b.bank)}>{b.bank}</button>)}</div></div>
+    <div className="outgoingKpis incomingKpis"><article><span>ยอดเงินขาเข้า</span><strong className="blue">฿{short(incomingAnalysis.total)}</strong><small>{fmt(incomingAnalysis.total)} บาท</small></article><article><span>จำนวนรายการ</span><strong>{incomingAnalysis.count.toLocaleString("th-TH")}</strong><small>เฉลี่ย ฿{fmt(incomingAnalysis.total/Math.max(incomingAnalysis.count,1))} ต่อครั้ง</small></article><article><span>แหล่งที่ระบุชื่อ/บัญชีได้</span><strong>{incomingAnalysis.identified.toLocaleString("th-TH")}</strong><small>รายหรือบัญชี แยกตามธนาคาร</small></article><article><span>รายการไม่ระบุผู้ส่ง</span><strong className="warnText">{incomingAnalysis.unidentifiedCount.toLocaleString("th-TH")}</strong><small>รวม EDC/QR และช่องทางที่ไม่มีชื่อผู้ส่ง</small></article></div>
+    <article className="surface monthlyOutgoing"><div className="sectionHead"><div><p>MONTHLY INCOMING</p><h2>แต่ละเดือนเข้ากี่ครั้ง จากกี่แหล่ง</h2></div><b>เลือก: {incomingBank==="all"?"รวม 3 ธนาคาร":incomingBank}</b></div><div className="outMonthGrid incomingMonths">{incomingAnalysis.monthly.map(m=><div key={m.month}><span>{monthNames[m.month]}</span><strong>฿{short(m.amount)}</strong><small>{m.count.toLocaleString("th-TH")} ครั้ง · ระบุแหล่งได้ {m.people.toLocaleString("th-TH")} ราย/บัญชี</small></div>)}</div></article>
+    <article className="surface recipientSurface senderSurface"><div className="sectionHead"><div><p>SENDER & INCOME SOURCE CONCENTRATION</p><h2>ผู้ส่งเงิน ช่องทางรับ และสัดส่วนเงินเข้า</h2><span className="muted">เปอร์เซ็นต์คำนวณจากยอดเงินเข้าของตัวเลือกปัจจุบัน</span></div><b>{incomingAnalysis.groups.length.toLocaleString("th-TH")} กลุ่มแหล่งเงิน</b></div><div className="recipientTable"><table><thead><tr><th>ธนาคาร</th><th>ชื่อผู้ส่ง / ช่องทางรับ</th><th>ประเภท</th><th className="number">จำนวนครั้ง</th><th className="number">ยอดรวม</th><th className="number">สัดส่วน</th></tr></thead><tbody>{incomingAnalysis.groups.map(g=><tr key={`${g.bank}-${g.name}`}><td><span className="bankPill" style={{borderColor:bankColor[g.bank]}}>{g.bank}</span></td><td><b>{g.name}</b><small>{Object.entries(g.months).map(([m,v])=>`${monthNames[m]} ${v.count} ครั้ง`).join(" · ")}</small></td><td><span className={`categoryPill ${g.identified?"":"unverified"}`}>{g.category}</span></td><td className="number">{g.count.toLocaleString("th-TH")}</td><td className="number blue">฿{fmt(g.amount)}</td><td className="number"><b>{(g.amount/Math.max(incomingAnalysis.total,1)*100).toFixed(2)}%</b><i className="shareBar incomingShare"><em style={{width:`${Math.min(100,g.amount/Math.max(incomingAnalysis.total,1)*100)}%`}}/></i></td></tr>)}</tbody></table></div><div className="evidenceNote"><b>วิธีอ่านและข้อจำกัด</b><p>จำนวนแหล่งเงินนับชื่อหรือเลขบัญชีแยกตามธนาคาร รายการ EDC/QR เงินฝาก เช็ค และรายการ BBL ที่ไม่มีชื่อผู้ส่ง จะรวมตามช่องทางรับและไม่นับเป็นบุคคล เพื่อป้องกันการสรุปจำนวนคนเกินจริง</p></div></article></section>}
 
-    <section className="kpis">
-      <button className="kpi" onClick={()=>document.getElementById("deposits")?.scrollIntoView({behavior:"smooth"})}><span>เงินฝาก/เงินเข้าทั้งหมด</span><strong className="positive">฿{compact(data.summary.totalIn)}</strong><small className="exact">ยอดจริง ฿{money(data.summary.totalIn)}</small><small>3,625 รายการ · กดเพื่อดูประเภทเงินฝาก</small></button>
-      <button className="kpi" onClick={()=>document.getElementById("banks")?.scrollIntoView({behavior:"smooth"})}><span>รับโอนผ่านธนาคาร</span><strong>฿{compact(transferIn)}</strong><small className="exact">ยอดจริง ฿{money(transferIn)}</small><small>แยกตามธนาคารต้นทางใน Statement</small></button>
-      <button className="kpi" onClick={()=>document.getElementById("deposits")?.scrollIntoView({behavior:"smooth"})}><span>EDC / QR และยอดขายบัตร</span><strong>฿{compact(data.summary.edc)}</strong><small className="exact">ยอดจริง ฿{money(data.summary.edc)}</small><small>42.43% ของเงินเข้าทั้งหมด</small></button>
-    </section>
+    {view==="transactions"&&<section className="surface txnPage"><div className="sectionHead"><div><p>ALL BANK TRANSACTIONS</p><h2>รายการเดินบัญชีรวม</h2><span className="muted">ค้นหาจาก {data.transactions.length.toLocaleString("th-TH")} รายการของทั้ง 3 ธนาคาร</span></div><b className="resultCount">พบ {rows.length.toLocaleString("th-TH")} รายการ</b></div><div className="filters"><label>ธนาคาร<select value={bank} onChange={e=>setBank(e.target.value)}><option value="all">ทุกธนาคาร</option>{data.banks.map(b=><option key={b.bank}>{b.bank}</option>)}</select></label><label>เดือน<select value={month} onChange={e=>setMonth(e.target.value)}><option value="all">ทุกเดือน</option>{["01","02","03","04","05","06"].map((m,i)=><option value={m} key={m}>{["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน"][i]}</option>)}</select></label><label>ทิศทาง<select value={direction} onChange={e=>setDirection(e.target.value)}><option value="all">เงินเข้าและออก</option><option value="in">เงินเข้า</option><option value="out">เงินออก</option></select></label><label className="searchBox">ค้นหาชื่อ เลขบัญชี หรือจำนวนเงิน<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="เช่น Pongsak, 500000, X1654…"/></label><button onClick={()=>{setBank("all");setMonth("all");setDirection("all");setQuery("")}}>ล้าง</button></div><div className="txnTable"><table><thead><tr><th>วันและเวลา</th><th>ธนาคาร</th><th>ทิศทาง</th><th>รายละเอียด</th><th className="number">จำนวนเงิน</th></tr></thead><tbody>{shown.map((r,i)=><tr key={`${r.bank}-${r.date}-${r.time}-${i}`}><td>{r.date}<small>{r.time}</small></td><td><span className="bankPill" style={{borderColor:bankColor[r.bank]}}>{r.bank}</span></td><td><span className={r.direction==="in"?"flowIn":"flowOut"}>{r.direction==="in"?"เงินเข้า":"เงินออก"}</span></td><td>{r.description}</td><td className={`number ${r.direction==="in"?"blue":"red"}`}>{r.direction==="in"?"+":"−"} ฿{fmt(r.amount)}</td></tr>)}</tbody></table></div><div className="pagination"><button disabled={page===1} onClick={()=>setPage(p=>p-1)}>← ก่อนหน้า</button><span>หน้า {page} / {pages}</span><button disabled={page===pages} onClick={()=>setPage(p=>p+1)}>ถัดไป →</button></div></section>}
 
-    <section className="dashboardGrid" id="composition">
-      <article className="panel monthlyPanel">
-        <div className="panelHead"><div><p className="eyebrow">แนวโน้ม 6 เดือน</p><h2>เงินเข้า–ออก รายเดือน</h2></div><button className="iconButton" onClick={()=>setExpanded("monthly")} aria-label="ขยายกราฟรายเดือน">↗</button></div>
-        <button className="monthChart" onClick={()=>setExpanded("monthly")} aria-label="ขยายกราฟเงินเข้าออก">
-          {data.months.map((m,i)=><div className="monthCol" key={m.month}><div className="barPair"><i className="bar inBar" style={{height:`${m.in/maxMonth*100}%`}}/><i className="bar outBar" style={{height:`${m.out/maxMonth*100}%`}}/></div><b>{m.month}</b><small>{compact(m.ending)}</small></div>)}
-        </button>
-        <div className="legend"><span><i className="dot green"/>เงินเข้า</span><span><i className="dot red"/>เงินออก</span><span>ตัวเลขใต้เดือน = ยอดคงเหลือ</span></div>
-      </article>
-
-      <article className="panel compositionPanel">
-        <div className="panelHead"><div><p className="eyebrow">องค์ประกอบรายรับ</p><h2>เงินเข้ามาจากอะไร</h2></div><button className="iconButton" onClick={()=>setExpanded("income")} aria-label="ขยายกราฟวงกลม">↗</button></div>
-        <button className="donutWrap" onClick={()=>setExpanded("income")} aria-label="ขยายกราฟสัดส่วนเงินเข้า"><span className="donut" style={{background:donut(income,incomeTotal)}}><span><b>฿179.60 ล้าน</b><small>฿{money(incomeTotal)}</small></span></span></button>
-        <div className="categoryList">{income.slice().sort((a,b)=>b.amount-a.amount).map((c,i)=><button key={c.category} onClick={()=>selectCategory(c)}><i style={{background:colors[i%colors.length]}}/><span>{c.category}<small>{c.count.toLocaleString("th-TH")} รายการ · ฿{money(c.amount)}</small></span><b>{(c.amount/incomeTotal*100).toFixed(1)}%</b></button>)}</div>
-      </article>
-    </section>
-
-    <section className="panel bankOverview" id="banks">
-      <div className="panelHead"><div><p className="eyebrow">BANK TRANSFER OVERVIEW</p><h2>สรุปการโอนเข้า–โอนออก แยกตามธนาคาร</h2><p className="muted">จัดกลุ่มจากรหัสธนาคารและช่องทางที่แสดงใน Statement พร้อมยอดเต็ม จำนวนรายการ และสัดส่วน</p></div><div className="bankNet"><span>เงินโอนสุทธิ</span><strong className="negative">฿{compact(transferIn-transferOut)}</strong><small>รับ ฿{money(transferIn)} − โอนออก ฿{money(transferOut)}</small></div></div>
-      <div className="bankOverviewGrid"><article><div className="bankColumnHead"><div><span className="typeIn">เงินโอนเข้า</span><h3>รับเข้าจากธนาคารใด</h3></div><div><strong>฿{compact(transferIn)}</strong><small>ยอดจริง ฿{money(transferIn)}</small></div></div><div className="mainBankRows">{bankIn.map((b,i)=><div key={b.name}><span className="bankNumber">{i+1}</span><span><b>{b.name}</b><small>{b.count.toLocaleString("th-TH")} รายการ</small></span><strong>฿{compact(b.amount)}<small>฿{money(b.amount)}</small></strong><em>{(b.amount/transferIn*100).toFixed(1)}%</em></div>)}</div></article><article><div className="bankColumnHead"><div><span className="typeOut">เงินโอนออก</span><h3>ส่งออกไปธนาคารใด</h3></div><div><strong className="negative">฿{compact(transferOut)}</strong><small>ยอดจริง ฿{money(transferOut)}</small></div></div><div className="mainBankRows outgoing">{bankOut.map((b,i)=><div key={b.name}><span className="bankNumber">{i+1}</span><span><b>{b.name}</b><small>{b.count.toLocaleString("th-TH")} รายการ</small></span><strong className="negative">฿{compact(b.amount)}<small>฿{money(b.amount)}</small></strong><em>{(b.amount/transferOut*100).toFixed(1)}%</em></div>)}</div></article></div>
-    </section>
-
-    <section className="panel depositOnly" id="deposits">
-      <div className="depositHeader"><div><p className="eyebrow">DEPOSIT SUMMARY ONLY</p><h2>สรุปเงินฝากและเงินเข้าทั้งหมดในรอบบัญชี</h2><p className="muted">รวมเฉพาะรายการที่เพิ่มยอดเงินในบัญชี ตั้งแต่ 1 มกราคม ถึง 30 มิถุนายน 2569</p></div><div><span>ยอดเงินฝาก/เงินเข้ารวม</span><strong>฿{compact(data.summary.totalIn)}</strong><small>ยอดจริง ฿{money(data.summary.totalIn)} · 3,625 รายการ</small></div></div>
-      <div className="depositGrid">{income.slice().sort((a,b)=>b.amount-a.amount).map((c,i)=><article key={c.category}><span className="depositIcon" style={{background:colors[i%colors.length]}}>{i+1}</span><div><h3>{c.category}</h3><p>{c.count.toLocaleString("th-TH")} รายการ · {(c.amount/data.summary.totalIn*100).toFixed(2)}% ของเงินเข้าทั้งหมด</p></div><strong>฿{compact(c.amount)}<small>ยอดจริง ฿{money(c.amount)}</small></strong></article>)}</div>
-      <div className="depositNote"><b>คำอธิบาย:</b> “เงินฝาก/เงินเข้า” ในรายงานนี้ประกอบด้วยรับโอน เงินสด เช็ค EDC/QR ยอดขายบัตร ธุรกรรมต่างประเทศ และดอกเบี้ยตามที่ปรากฏใน Statement ไม่ได้หมายถึงรายได้ทางบัญชีทั้งหมด</div>
-    </section>
-
-    <section className="panel dailyPanel" id="daily">
-      <div className="panelHead"><div><p className="eyebrow">องค์ประกอบรายวัน</p><h2>เงินของแต่ละวันประกอบด้วยอะไร</h2><p className="muted">เลือกวันที่เพื่อดูยอดรวม หมวดที่เกิดขึ้น และรายการทั้งหมดของวันนั้น</p></div><label className="datePicker">เลือกวันที่<select value={selectedDate} onChange={e=>setSelectedDate(e.target.value)}>{dates.map(d=><option value={d} key={d}>{d}</option>)}</select></label></div>
-      <div className="dailySummary">
-        <div><span>เงินเข้าของวัน</span><strong className="positive">฿{compact(dailyIn)}</strong><small>ยอดจริง ฿{money(dailyIn)} · {dailyRows.filter(t=>t.direction==="in").length} รายการ</small></div>
-        <div><span>เงินออกของวัน</span><strong className="negative">฿{compact(dailyOut)}</strong><small>ยอดจริง ฿{money(dailyOut)} · {dailyRows.filter(t=>t.direction==="out").length} รายการ</small></div>
-        <div><span>สุทธิของวัน</span><strong className={dailyIn-dailyOut>=0?"positive":"negative"}>฿{compact(dailyIn-dailyOut)}</strong><small>ยอดจริง ฿{money(dailyIn-dailyOut)}</small></div>
-        <div><span>ยอดคงเหลือท้ายวัน</span><strong>฿{compact(dailyBalance)}</strong><small>ยอดจริง ฿{money(dailyBalance)}</small></div>
-      </div>
-      <div className="dailyDetailGrid"><div className="dailyBreakdown"><h3>สัดส่วนตามหมวด</h3>{dailyCats.length?<div className="dailyCatList">{dailyCats.map((c,i)=><button key={`${c.direction}-${c.category}`} onClick={()=>selectCategory(c)}><i style={{background:colors[i%colors.length]}}/><span><b>{c.category}</b><small>{c.direction==="in"?"เงินเข้า":"เงินออก"} · {c.count} รายการ</small></span><strong>฿{money(c.amount)}</strong></button>)}</div>:<p className="muted">ไม่มีรายการในวันนี้</p>}</div><div className="dailyTransactions"><h3>รายการของวันที่ {selectedDate}</h3>{dailyRows.slice(0,12).map((t,i)=><div className="dailyTxn" key={`${t.time}-${i}`}><span>{t.time}<small>{t.category}</small></span><p>{t.description}<small>{t.detail}</small></p><b className={t.direction==="in"?"positive":"negative"}>{t.direction==="in"?"+":"−"} ฿{money(t.amount)}</b></div>)}{dailyRows.length>12&&<button className="textButton" onClick={()=>{setQuery(selectedDate);document.getElementById("transactions")?.scrollIntoView({behavior:"smooth"})}}>ดูครบทั้ง {dailyRows.length} รายการ →</button>}</div></div>
-    </section>
-
-    <section className="panel drillPanel">
-      <div className="panelHead"><div><p className="eyebrow">หมวดสำคัญ</p><h2>กดเพื่อเจาะดูรายละเอียด</h2></div><button className="textButton" onClick={()=>setExpanded("outcome")}>ดูสัดส่วนเงินออก</button></div>
-      <div className="drillGrid">{[...data.categories].sort((a,b)=>b.amount-a.amount).slice(0,8).map(c=><button className="drillCard" key={`${c.direction}-${c.category}`} onClick={()=>selectCategory(c)}><span className={c.direction==="in"?"typeIn":"typeOut"}>{c.direction==="in"?"เงินเข้า":"เงินออก"}</span><h3>{c.category}</h3><strong>฿{compact(c.amount)}</strong><span className="cardExact">ยอดจริง ฿{money(c.amount)}</span><small>{c.count.toLocaleString("th-TH")} รายการ <b>เปิดดู →</b></small></button>)}</div>
-    </section>
-
-    <section className="panel transactionPanel" id="transactions">
-      <div className="panelHead"><div><p className="eyebrow">ตรวจสอบต้นทาง</p><h2>รายการเดินบัญชี</h2><p className="muted">พบ {rows.length.toLocaleString("th-TH")} รายการ</p></div></div>
-      <div className="filters">
-        <label>ประเภท<select value={direction} onChange={e=>{setDirection(e.target.value as typeof direction);setCategory("all")}}><option value="all">ทั้งหมด</option><option value="in">เงินเข้า</option><option value="out">เงินออก</option></select></label>
-        <label>หมวด<select value={category} onChange={e=>setCategory(e.target.value)}><option value="all">ทุกหมวด</option>{catOptions.map(c=><option key={`${c.direction}-${c.category}`} value={c.category}>{c.category}</option>)}</select></label>
-        <label>เดือน<select value={month} onChange={e=>setMonth(Number(e.target.value))}><option value="0">ทุกเดือน</option>{data.months.map((m,i)=><option value={i+1} key={m.month}>{m.month} 2569</option>)}</select></label>
-        <label className="search">ค้นหา<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ชื่อ รายละเอียด วันที่…"/></label>
-        {(direction!=="all"||category!=="all"||month||query)&&<button className="reset" onClick={()=>{setDirection("all");setCategory("all");setMonth(0);setQuery("")}}>ล้างตัวกรอง</button>}
-      </div>
-      <div className="tableWrap"><table><thead><tr><th>วันและเวลา</th><th>รายการ / รายละเอียด</th><th>ประเภท</th><th className="number">จำนวนเงิน</th><th className="number">ยอดคงเหลือ</th></tr></thead><tbody>{shown.map((t,i)=><tr key={`${t.date}-${t.time}-${i}`}><td><b>{t.date}</b><small>{t.time} น.</small></td><td><b>{t.description}</b><small>{t.detail || "—"}</small></td><td><span className={t.direction==="in"?"pill inPill":"pill outPill"}>{t.category}</span></td><td className={`number ${t.direction==="in"?"positive":"negative"}`}><b>{t.direction==="in"?"+":"−"} {money(t.amount)}</b></td><td className="number">{money(t.balance)}</td></tr>)}</tbody></table></div>
-      {pageCount>1&&<div className="pagination"><button disabled={page===1} onClick={()=>setPage(p=>p-1)}>← ก่อนหน้า</button><span>หน้า {page.toLocaleString("th-TH")} จาก {pageCount.toLocaleString("th-TH")}</span><button disabled={page===pageCount} onClick={()=>setPage(p=>p+1)}>ถัดไป →</button></div>}
-    </section>
-
-    <footer><img src="/sangchai-logo.jpeg" alt="Sangchai Panich"/>ข้อมูลจาก KBank Statement รอบ 01/01/2026–30/06/2026 · ตัวเลขรวมตรวจสอบตรงกับยอดสรุปของธนาคาร</footer>
-
-    {expanded&&<div className="modal" role="dialog" aria-modal="true" onClick={()=>setExpanded(null)}><div className="modalCard" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setExpanded(null)}>×</button>{expanded==="monthly"?<><p className="eyebrow">มุมมองขนาดใหญ่</p><h2>เงินเข้า–ออก และยอดคงเหลือรายเดือน</h2><div className="largeMonthChart">{data.months.map((m,i)=><div key={m.month}><div className="largeBars"><i style={{height:`${m.in/maxMonth*100}%`}}/><i style={{height:`${m.out/maxMonth*100}%`}}/></div><b>{m.month}</b><small>เข้า ฿{compact(m.in)}<br/>ออก ฿{compact(m.out)}<br/>คงเหลือ ฿{compact(m.ending)}</small></div>)}</div></>:<><p className="eyebrow">มุมมองขนาดใหญ่</p><h2>{expanded==="income"?"สัดส่วนเงินเข้า":"สัดส่วนเงินออก"}</h2>{(()=>{const list=expanded==="income"?income:outcome;const total=list.reduce((s,c)=>s+c.amount,0);return <div className="largeDonutLayout"><span className="donut largeDonut" style={{background:donut(list,total)}}><span><b>฿{compact(total)}</b><small>{list.reduce((s,c)=>s+c.count,0).toLocaleString("th-TH")} รายการ</small></span></span><div className="categoryList largeList">{list.slice().sort((a,b)=>b.amount-a.amount).map((c,i)=><button key={c.category} onClick={()=>{setExpanded(null);selectCategory(c)}}><i style={{background:colors[i%colors.length]}}/><span>{c.category}<small>{c.count.toLocaleString("th-TH")} รายการ</small></span><b>฿{compact(c.amount)} · {(c.amount/total*100).toFixed(1)}%</b></button>)}</div></div>})()}</>}</div></div>}
-  </main>;
+    {view==="audit"&&<><section className="auditHero"><div><p>CONTROL & RECONCILIATION</p><h2>ระบบตรวจสอบได้จากหลักฐานต้นทาง</h2><span>แสดงสิ่งที่ยืนยันแล้ว สิ่งที่ต้องขอเอกสาร และรายการควบคุมสำคัญ</span></div><div className="auditScore"><b>3/5</b><span>การควบคุมผ่านสมบูรณ์</span></div></section><section className="auditGrid"><article className="surface"><div className="sectionHead"><div><p>DATA QUALITY</p><h2>รายการควบคุมคุณภาพ</h2></div></div>{data.quality.map(q=><div className="qualityDetail" key={q.label}><i className={q.status}>{q.status==="pass"?"ผ่าน":"รอตรวจ"}</i><div><b>{q.label}</b><p>{q.detail}</p></div></div>)}</article><article className="surface"><div className="sectionHead"><div><p>INTERNAL TRANSFERS</p><h2>รายการโอนภายในที่ยืนยันแล้ว</h2></div><b>฿{fmt(t.internal)}</b></div>{data.internalTransfers.map(x=><div className="miniRow" key={`${x.date}-${x.time}`}><span>{x.date}<small>{x.time}</small></span><b>{x.from} → {x.to}</b><strong>{fmt(x.amount)}</strong></div>)}</article><article className="surface"><div className="sectionHead"><div><p>CASH CONTROL</p><h2>ถอนเงินสดผ่านสาขา</h2></div><b>฿{fmt(t.cash)}</b></div>{data.cashWithdrawals.map(x=><div className="miniRow" key={`${x.date}-${x.time}`}><span>{x.date}<small>{x.day} · {x.time}</small></span><b>{x.reference}</b><strong>{fmt(x.amount)}</strong></div>)}</article><article className="surface"><div className="sectionHead"><div><p>PERSON REVIEW</p><h2>รายการเฉพาะบุคคล</h2></div></div>{data.personTransfers.map(x=><div className="personRow" key={`${x.date}-${x.direction}`}><span className={x.direction==="in"?"flowIn":"flowOut"}>{x.direction==="in"?"เงินเข้า":"เงินออก"}</span><div><b>{x.counterparty}</b><p>{x.date} · {x.bank} · {x.detail}</p></div><strong className={x.direction==="in"?"blue":"red"}>{fmt(x.amount)}</strong></div>)}<div className="evidenceNote"><b>ข้อจำกัดของหลักฐาน</b><p>ชื่อผู้โอนใน KBANK ถูกตัดเป็น “LAOHAW...” และข้อมูลคู่โอนของ BBL ไม่ครบ จึงต้องเก็บสถานะ “รอตรวจเอกสาร” ไว้จนกว่าจะได้รับเอกสารเพิ่มเติม</p></div></article></section></>}
+    <footer><span>แหล่งข้อมูล: Statement KBANK, BBL และ KTB · {data.meta.period}</span><b>ระบบรายงานเพื่อการตรวจสอบภายใน ไม่ใช่งบการเงิน</b></footer></section>
+  </main>
 }

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability, @next/next/no-html-link-for-pages */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

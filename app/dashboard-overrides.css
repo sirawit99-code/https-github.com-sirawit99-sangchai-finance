@@ -1,0 +1,589 @@
+.dashboardApp .red {
+  background: transparent !important;
+  color: #c90918 !important;
+}
+
+.dashboardApp .blue {
+  background: transparent !important;
+  color: #253b96 !important;
+}
+
+.summaryStrip article:nth-child(3) {
+  background: #fff8f8;
+  border-color: #f1c9cc;
+  border-top-color: #d20b1a;
+}
+
+.summaryStrip article:nth-child(4) {
+  background: #fff3f3;
+  border-color: #ecb9bd;
+  border-top-color: #a80714;
+}
+
+.summaryStrip article:nth-child(3) strong,
+.summaryStrip article:nth-child(4) strong {
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.summaryStrip article:nth-child(3) small,
+.summaryStrip article:nth-child(4) small {
+  color: #4e596e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summaryStrip article:nth-child(4) span::after {
+  content: "สุทธิจากต้นงวด";
+  display: block;
+  width: max-content;
+  margin-top: 5px;
+  padding: 3px 7px;
+  border-radius: 99px;
+  background: #ffe0e2;
+  color: #9f0713;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.bankDelta .red {
+  background: transparent !important;
+  font-size: 15px;
+}
+
+.sideNav nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: 10px;
+  color: #c9d0ef;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.sideNav nav a:hover {
+  background: #ffffff14;
+  color: #fff;
+}
+
+.sideNav nav a i {
+  width: 22px;
+  font-size: 19px;
+  font-style: normal;
+  text-align: center;
+}
+
+.headerTools .refreshButton {
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid #bdc6d8;
+}
+
+.headerTools .refreshButton:hover {
+  border-color: var(--navy);
+  background: #f5f7fb;
+}
+
+.headerTools .refreshButton:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.refreshStatus {
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.refreshStatus.done {
+  color: #23744e;
+}
+
+.refreshStatus.error {
+  color: #c40a18;
+  font-weight: 900;
+}
+
+/* Management attention must remain legible in executive review. */
+.attentionSurface {
+  padding: 24px 26px;
+}
+
+.attentionSurface .sectionHead p {
+  font-size: 12px;
+  letter-spacing: .11em;
+}
+
+.attentionSurface .sectionHead h2 {
+  margin-top: 6px;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.attentionSurface .alertCount {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.attentionSurface .alertList {
+  margin-top: 18px;
+}
+
+.attentionSurface .alertList article {
+  grid-template-columns: 36px 1fr;
+  gap: 14px;
+  padding: 17px 0;
+}
+
+.attentionSurface .alertList article > span {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+
+.attentionSurface .alertList b {
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.attentionSurface .alertList p {
+  margin: 6px 0;
+  color: #56647d;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.attentionSurface .alertList small {
+  display: block;
+  margin-top: 7px;
+  color: #245797;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (max-width: 680px) {
+  .attentionSurface {
+    padding: 19px 17px;
+  }
+
+  .attentionSurface .alertList b {
+    font-size: 16px;
+  }
+
+  .attentionSurface .alertList p,
+  .attentionSurface .alertList small {
+    font-size: 13px;
+  }
+}
+
+/* Outgoing recipient and vendor analysis */
+.outgoingPage {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.outgoingHero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px 27px;
+  color: #fff;
+  background: linear-gradient(135deg, #172361, #293e9a);
+  border-left: 6px solid var(--red);
+  border-radius: 15px;
+}
+
+.outgoingHero p,
+.outgoingHero h2,
+.outgoingHero span { margin: 0; }
+.outgoingHero p { color: #ffadb4; font-size: 11px; font-weight: 900; letter-spacing: .1em; }
+.outgoingHero h2 { margin: 6px 0; font-size: 25px; }
+.outgoingHero span { color: #ccd4fa; font-size: 12px; }
+.incomingHero { background: linear-gradient(135deg, #15205f, #245797); border-left-color: #2e9b67; }
+.incomingHero p { color: #9fe0bf; }
+.outgoingTabs { display: flex; flex-wrap: wrap; gap: 7px; justify-content: end; }
+.outgoingTabs button { padding: 10px 13px; border: 1px solid #ffffff3d; border-radius: 9px; color: #fff; background: #ffffff12; font-weight: 900; cursor: pointer; }
+.outgoingTabs button.active { color: var(--navy); background: #fff; }
+
+.outgoingKpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.outgoingKpis article { padding: 18px 20px; border: 1px solid var(--line); border-top: 4px solid var(--blue); border-radius: 14px; background: #fff; }
+.outgoingKpis article:first-child { border-top-color: var(--red); }
+.incomingKpis article:first-child { border-top-color: #2e9b67; }
+.outgoingKpis span,.outgoingKpis strong,.outgoingKpis small { display: block; }
+.outgoingKpis span { color: var(--muted); font-size: 12px; font-weight: 800; }
+.outgoingKpis strong { margin: 6px 0; color: var(--navy); font-size: 27px; }
+.outgoingKpis small { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.warnText { color: #a86d00 !important; }
+.pdfDownload { display: inline-flex; align-items: center; min-height: 39px; padding: 0 15px; color: #fff; background: var(--navy); border-radius: 9px; font-size: 13px; font-weight: 900; text-decoration: none; white-space: nowrap; }
+.pdfDownload:hover { background: #27388e; }
+.dashboardNotice { position: fixed; z-index: 50; top: 104px; right: 34px; padding: 13px 17px; color: #176b45; background: #e8f7ef; border: 1px solid #b9e3ca; border-radius: 10px; box-shadow: 0 8px 28px #17236122; font-size: 14px; font-weight: 900; }
+.dashboardNotice.error { color: #9e1821; background: #fff0f1; border-color: #f1c7ca; }
+
+.monthlyOutgoing .sectionHead > b,
+.recipientSurface .sectionHead > b { font-size: 14px; }
+.recipientSurface .sectionHead p { font-size: 14px; letter-spacing: .11em; }
+.recipientSurface .sectionHead h2 { margin-top: 7px; font-size: 25px; line-height: 1.3; }
+.recipientSurface .sectionHead .muted { display: block; margin-top: 7px; font-size: 13px; line-height: 1.5; }
+.recipientSurface .sectionHead > b { font-size: 17px; white-space: nowrap; }
+.outMonthGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 17px; }
+.outMonthGrid > div { padding: 14px 12px; border: 1px solid #e4e8f0; border-radius: 10px; background: #f8f9fc; }
+.outMonthGrid span,.outMonthGrid strong,.outMonthGrid small { display: block; }
+.outMonthGrid span { color: var(--red); font-size: 11px; font-weight: 900; }
+.outMonthGrid strong { margin: 6px 0; color: var(--navy); font-size: 18px; }
+.outMonthGrid small { color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+.recipientTable { overflow: auto; margin-top: 17px; }
+.recipientTable table { width: 100%; min-width: 940px; border-collapse: collapse; }
+.recipientTable th { padding: 13px 11px; color: var(--muted); background: #f3f5f8; font-size: 13px; text-align: left; }
+.recipientTable td { padding: 15px 11px; border-bottom: 1px solid #edf0f4; font-size: 14px; vertical-align: middle; }
+.recipientTable td:nth-child(2) { min-width: 260px; }
+.recipientTable td > b,.recipientTable td > small { display: block; }
+.recipientTable td > b { font-size: 15px; line-height: 1.4; }
+.recipientTable td > small { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.categoryPill { display: inline-block; padding: 6px 9px; color: #245797; background: #e9f1fc; border-radius: 99px; font-size: 12px; font-weight: 900; white-space: nowrap; }
+.categoryPill.unverified { color: #8a620c; background: #fff3d8; }
+.shareBar { display: block; width: 70px; height: 5px; margin: 5px 0 0 auto; overflow: hidden; background: #edf0f5; border-radius: 99px; }
+.shareBar em { display: block; height: 100%; background: var(--red); border-radius: inherit; }
+.incomingShare em { background: var(--blue); }
+.incomingMonths > div { border-top: 3px solid var(--blue); }
+.incomingMonths span { color: var(--blue); }
+.senderSurface .categoryPill:not(.unverified) { color: #176b45; background: #e8f7ef; }
+
+@media (max-width: 1100px) {
+  .outgoingKpis { grid-template-columns: repeat(2, 1fr); }
+  .outMonthGrid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 680px) {
+  .outgoingHero { align-items: flex-start; flex-direction: column; padding: 20px; }
+  .outgoingTabs { justify-content: start; }
+  .outgoingKpis { grid-template-columns: 1fr; }
+  .outMonthGrid { grid-template-columns: repeat(2, 1fr); }
+  .pdfDownload { min-height: 37px; padding: 0 11px; font-size: 11px; }
+  .dashboardNotice { top: 83px; right: 12px; left: 12px; text-align: center; }
+}
+
+@media (max-width: 1050px) {
+  .refreshStatus {
+    display: none;
+  }
+
+  .headerTools .refreshButton {
+    padding: 10px;
+    font-size: 11px;
+  }
+}
+
+/* Compact cards with stronger financial-number hierarchy. */
+.summaryStrip {
+  gap: 9px;
+  margin: 16px 0;
+}
+
+.summaryStrip article {
+  min-height: 128px;
+  padding: 13px 16px;
+  border-radius: 11px;
+}
+
+.summaryStrip span {
+  font-size: 11px;
+}
+
+.summaryStrip strong,
+.summaryStrip article:nth-child(3) strong,
+.summaryStrip article:nth-child(4) strong {
+  margin: 5px 0;
+  font-size: clamp(26px, 2vw, 34px);
+  line-height: 1.12;
+  white-space: nowrap;
+}
+
+.summaryStrip .primaryKpi strong {
+  font-size: clamp(28px, 2.2vw, 37px);
+}
+
+.summaryStrip small,
+.summaryStrip article:nth-child(3) small,
+.summaryStrip article:nth-child(4) small {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.bankCards {
+  gap: 9px;
+  margin-top: 11px;
+}
+
+.bankCards > article {
+  padding: 11px 13px;
+  border-radius: 10px;
+}
+
+.bankCards > article {
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.bankCards > article:hover,
+.bankCards > article.selected {
+  transform: translateY(-2px);
+  border-color: var(--bank);
+  box-shadow: 0 8px 20px #17236116;
+}
+
+.bankCards > article.selected {
+  outline: 3px solid color-mix(in srgb, var(--bank) 18%, transparent);
+}
+
+.bankSelect {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.compareAll {
+  border: 1px solid #cbd3e1;
+  border-radius: 8px;
+  background: #f7f8fb;
+  color: var(--navy);
+  padding: 8px 11px;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.bankComparison {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.comparisonHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 15px;
+}
+
+.comparisonHead p,
+.comparisonHead h3 {
+  margin: 0;
+}
+
+.comparisonHead p {
+  color: var(--red);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.comparisonHead h3 {
+  margin-top: 3px;
+  color: var(--navy);
+  font-size: 17px;
+}
+
+.comparisonTabs {
+  display: flex;
+  gap: 5px;
+  padding: 4px;
+  border-radius: 9px;
+  background: #eef1f6;
+}
+
+.comparisonTabs button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #68748c;
+  padding: 7px 10px;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.comparisonTabs button.active {
+  background: #fff;
+  color: var(--navy);
+  box-shadow: 0 2px 7px #17236117;
+}
+
+.comparisonRows {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+  margin-top: 11px;
+}
+
+.comparisonRows.single {
+  grid-template-columns: minmax(460px, 1fr);
+}
+
+.comparisonRows > article {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--bank);
+  border-radius: 9px;
+  background: #fafbfc;
+}
+
+.comparisonRows article header,
+.comparisonRows article footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.comparisonRows article header > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.comparisonRows article header i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bank);
+}
+
+.comparisonRows article header small {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 400;
+}
+
+.comparisonRows article header strong {
+  font-size: 13px;
+}
+
+.flowCompare {
+  display: grid;
+  gap: 9px;
+  margin: 12px 0;
+}
+
+.flowCompare > div {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 5px 8px;
+  align-items: center;
+}
+
+.flowCompare span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.flowCompare b {
+  text-align: right;
+  font-size: 13px;
+}
+
+.flowCompare > div > i {
+  grid-column: 1 / 3;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e8ecf3;
+}
+
+.flowCompare > div > i em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue);
+}
+
+.flowCompare > div + div > i em {
+  background: var(--red);
+}
+
+.comparisonRows article footer {
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.comparisonRows article footer b {
+  color: var(--navy);
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .comparisonRows,
+  .comparisonRows.single {
+    grid-template-columns: 1fr;
+  }
+
+  .comparisonHead {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+.bankBalance {
+  padding: 8px 0 7px;
+}
+
+.bankBalance strong {
+  margin-top: 2px;
+  font-size: clamp(24px, 2vw, 31px);
+  line-height: 1.1;
+}
+
+.bankStats {
+  gap: 8px;
+}
+
+.bankStats span {
+  font-size: 10px;
+}
+
+.bankStats b {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.bankDelta {
+  margin-top: 8px;
+  padding-top: 7px;
+}
+
+.bankDelta span,
+.bankDelta small {
+  font-size: 10px;
+}
+
+.bankDelta .red {
+  font-size: 17px;
+}
+
+@media (max-width: 1250px) {
+  .summaryStrip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .summaryStrip strong,
+  .summaryStrip article:nth-child(3) strong,
+  .summaryStrip article:nth-child(4) strong {
+    font-size: 30px;
+  }
+}
