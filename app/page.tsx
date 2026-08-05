@@ -106,6 +106,8 @@ export default function Home(){
   // Reset pagination whenever the active transaction query changes.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(()=>setPage(1),[bank,month,direction,query]);
+  // Keep the destination heading visible when switching between dashboard views.
+  useEffect(()=>{window.scrollTo({top:0,behavior:"smooth"})},[view]);
   const rows=useMemo(()=>data?.transactions.filter(t=>(bank==="all"||t.bank===bank)&&(direction==="all"||t.direction===direction)&&(month==="all"||t.date.slice(5,7)===month)&&(!query||`${t.date} ${t.time} ${t.description} ${t.amount}`.toLowerCase().includes(query.toLowerCase())))??[],[data,bank,month,direction,query]);
   const outgoingAnalysis=useMemo(()=>{
     if(!data)return {groups:[] as OutgoingGroup[],total:0,count:0,identified:0,unidentifiedCount:0,monthly:[] as {month:string;amount:number;count:number;people:number}[]};
