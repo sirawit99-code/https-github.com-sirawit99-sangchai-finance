@@ -107,7 +107,7 @@ export default function Home(){
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(()=>setPage(1),[bank,month,direction,query]);
   // Keep the destination heading visible when switching between dashboard views.
-  useEffect(()=>{const timer=window.setTimeout(()=>{document.documentElement.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0)},350);return()=>window.clearTimeout(timer)},[view]);
+  useEffect(()=>{const reset=()=>{document.documentElement.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0)};reset();const frame=window.requestAnimationFrame(reset);const timer=window.setTimeout(reset,180);return()=>{window.cancelAnimationFrame(frame);window.clearTimeout(timer)}},[view]);
   const rows=useMemo(()=>data?.transactions.filter(t=>(bank==="all"||t.bank===bank)&&(direction==="all"||t.direction===direction)&&(month==="all"||t.date.slice(5,7)===month)&&(!query||`${t.date} ${t.time} ${t.description} ${t.amount}`.toLowerCase().includes(query.toLowerCase())))??[],[data,bank,month,direction,query]);
   const outgoingAnalysis=useMemo(()=>{
     if(!data)return {groups:[] as OutgoingGroup[],total:0,count:0,identified:0,unidentifiedCount:0,monthly:[] as {month:string;amount:number;count:number;people:number}[]};
