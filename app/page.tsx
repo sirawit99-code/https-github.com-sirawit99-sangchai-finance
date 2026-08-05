@@ -7,12 +7,13 @@ import "./dashboard-overrides.css";
 type Bank = { bank:string; account:string; opening:number; incoming:number; outgoing:number; ending:number; tax:number; transactions:number; months:{label:string;incoming:number;outgoing:number;ending:number}[] };
 type Txn = { bank:string; date:string; time:string; direction:"in"|"out"; amount:number; description:string };
 type Data = { meta:{entity:string;period:string;generated:string}; banks:Bank[]; combined:{label:string;incoming:number;outgoing:number;net:number;ending:number}[]; totals:{opening:number;incoming:number;outgoing:number;ending:number;tax:number;internal:number;cash:number}; internalTransfers:{date:string;time:string;from:string;to:string;amount:number}[]; cashWithdrawals:{date:string;day:string;time:string;reference:string;amount:number}[]; personTransfers:{date:string;bank:string;direction:"in"|"out";amount:number;counterparty:string;detail:string}[]; alerts:{level:string;title:string;detail:string;action:string}[]; quality:{label:string;status:string;detail:string}[]; transactions:Txn[] };
-type OutgoingGroup = { bank:string; name:string; category:string; amount:number; count:number; months:Record<string,{amount:number;count:number}>; identified:boolean };
+type OutgoingGroup = { bank:string; banks?:string[]; name:string; category:string; amount:number; count:number; months:Record<string,{amount:number;count:number}>; identified:boolean };
 
 const fmt=(n:number)=>new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
 const short=(n:number)=>`${(Math.abs(n)/1e6).toFixed(2)} ลบ.`;
 const bankColor:Record<string,string>={KBANK:"#239a60",BBL:"#254aa5",KTB:"#0aa8d6"};
 const monthNames:Record<string,string>={"01":"ม.ค.","02":"ก.พ.","03":"มี.ค.","04":"เม.ย.","05":"พ.ค.","06":"มิ.ย.","07":"ก.ค."};
+const recipientKey=(name:string)=>name.toLocaleLowerCase("th-TH").replace(/(?:บริษัท|บริษัทฯ|บจ\.?|หจก\.?|co\.?\s*,?\s*ltd\.?|company\s+limited)/giu,"").replace(/[^\p{L}\p{N}]/gu,"");
 
 function outgoingIdentity(t:Txn){
   const d=t.description.replace(/\+\+$/g,"").trim();
@@ -110,9 +111,9 @@ export default function Home(){
     if(!data)return {groups:[] as OutgoingGroup[],total:0,count:0,identified:0,unidentifiedCount:0,monthly:[] as {month:string;amount:number;count:number;people:number}[]};
     const txns=data.transactions.filter(t=>t.direction==="out"&&(outgoingBank==="all"||t.bank===outgoingBank));
     const map=new Map<string,OutgoingGroup>();
-    for(const t of txns){const identity=outgoingIdentity(t),key=`${t.bank}|${identity.name}`,month=t.date.slice(5,7);const g=map.get(key)||{bank:t.bank,name:identity.name,category:identity.category,amount:0,count:0,months:{},identified:identity.identified};g.amount+=t.amount;g.count++;g.months[month]??={amount:0,count:0};g.months[month].amount+=t.amount;g.months[month].count++;map.set(key,g)}
+    for(const t of txns){const identity=outgoingIdentity(t),key=identity.identified?recipientKey(identity.name):`${t.bank}|${identity.name}`,month=t.date.slice(5,7);const g=map.get(key)||{bank:t.bank,banks:[t.bank],name:identity.name,category:identity.category,amount:0,count:0,months:{},identified:identity.identified};if(!g.banks?.includes(t.bank))g.banks?.push(t.bank);g.bank=(g.banks??[t.bank]).join(" / ");g.amount+=t.amount;g.count++;g.months[month]??={amount:0,count:0};g.months[month].amount+=t.amount;g.months[month].count++;map.set(key,g)}
     const groups=[...map.values()].sort((a,b)=>b.amount-a.amount), monthly=Object.keys(monthNames).map(month=>{const monthRows=txns.filter(t=>t.date.slice(5,7)===month);return {month,amount:monthRows.reduce((s,t)=>s+t.amount,0),count:monthRows.length,people:new Set(monthRows.map(t=>{const x=outgoingIdentity(t);return x.identified?`${t.bank}|${x.name}`:""}).filter(Boolean)).size}});
-    return {groups,total:txns.reduce((s,t)=>s+t.amount,0),count:txns.length,identified:new Set(groups.filter(g=>g.identified).map(g=>`${g.bank}|${g.name}`)).size,unidentifiedCount:groups.filter(g=>!g.identified).reduce((s,g)=>s+g.count,0),monthly};
+    return {groups,total:txns.reduce((s,t)=>s+t.amount,0),count:txns.length,identified:groups.filter(g=>g.identified).length,unidentifiedCount:groups.filter(g=>!g.identified).reduce((s,g)=>s+g.count,0),monthly};
   },[data,outgoingBank]);
   const incomingAnalysis=useMemo(()=>{
     if(!data)return {groups:[] as OutgoingGroup[],total:0,count:0,identified:0,unidentifiedCount:0,monthly:[] as {month:string;amount:number;count:number;people:number}[]};
