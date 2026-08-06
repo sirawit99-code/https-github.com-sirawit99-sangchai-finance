@@ -42,10 +42,14 @@ export async function PATCH(request:Request){
   try{
     await ensureDatabase();const body=await request.json() as Record<string,unknown>;const id=String(body.id||"");
     const name=String(body.canonical_name||"").trim(),category=String(body.category||"").trim(),status=String(body.review_status||"").trim(),note=String(body.note||"").trim();
+    const rawAccounts=Array.isArray(body.accounts)?body.accounts:JSON.parse(String(body.accounts_json||"[]"));
+    const accounts=[...new Set(rawAccounts.map((x:unknown)=>String(x).trim()).filter(Boolean))];
     if(!id||!name)return Response.json({error:"กรุณาระบุชื่อมาตรฐาน"},{status:400});
     if(!["กิจการเกี่ยวข้อง","คู่ค้านิติบุคคล","บุคคล","พนักงาน","หน่วยงานรัฐ","อื่นๆ","รอตรวจสอบ"].includes(category))return Response.json({error:"ประเภทไม่ถูกต้อง"},{status:400});
     if(!["รอตรวจสอบ","ยืนยันแล้ว","ต้องแก้ไข","ไม่ใช่รายเดียวกัน"].includes(status))return Response.json({error:"สถานะไม่ถูกต้อง"},{status:400});
-    await env.DB.prepare("UPDATE vendor_profiles SET canonical_name=?,category=?,review_status=?,note=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(name,category,status,note,id).run();
+    if(accounts.length===0)return Response.json({error:"คู่ค้าต้องมีอย่างน้อย 1 บัญชี"},{status:400});
+    if(accounts.length>30||accounts.some(x=>x.length>80))return Response.json({error:"ข้อมูลบัญชีมากหรือยาวเกินไป"},{status:400});
+    await env.DB.prepare("UPDATE vendor_profiles SET canonical_name=?,category=?,accounts_json=?,review_status=?,note=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(name,category,JSON.stringify(accounts),status,note,id).run();
     return Response.json({ok:true});
   }catch(error){return Response.json({error:error instanceof Error?error.message:"บันทึกไม่สำเร็จ"},{status:500})}
 }
