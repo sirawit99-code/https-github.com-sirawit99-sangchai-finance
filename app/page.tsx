@@ -1,29 +1,16 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
+import DashboardClient from "@/components/dashboard-client";
+import { requireUser } from "@/lib/access";
+import "./main-v2.css";
+import "./dashboard-overrides.css";
 
-export default function Home() {
-  const authReady = Boolean(process.env.AUTH_SECRET && process.env.AUTH_PASSWORD && process.env.ADMIN_EMAILS);
-  const dbReady = Boolean(process.env.DATABASE_URL);
+export const dynamic = "force-dynamic";
 
-  return (
-    <main className="welcome-shell">
-      <section className="welcome-card">
-        <div className="brand-mark">SC</div>
-        <p className="eyebrow">SANGCHAI FINANCE CONTROL</p>
-        <h1>ระบบหลังบ้านอนุมัติข้อมูลการเงิน</h1>
-        <p className="lead">ตรวจสอบ อนุมัติ ปฏิเสธ และย้อนดูประวัติการตัดสินใจได้จากจุดเดียว</p>
-        <div className="readiness">
-          <span className={authReady ? "ready" : "waiting"}>{authReady ? "✓" : "!"} ระบบ Login</span>
-          <span className={dbReady ? "ready" : "waiting"}>{dbReady ? "✓" : "!"} ฐานข้อมูล</span>
-        </div>
-        {authReady && dbReady ? (
-          <Link className="primary-link" href="/admin">เข้าสู่ระบบหลังบ้าน</Link>
-        ) : (
-          <div className="setup-note">
-            <strong>โปรเจกต์พร้อม Deploy</strong>
-            <span>กำหนดระบบ Login และเชื่อมฐานข้อมูล Neon บน Vercel ก่อนเริ่มใช้งาน</span>
-          </div>
-        )}
-      </section>
-    </main>
-  );
+export default async function Home() {
+  try {
+    await requireUser();
+  } catch {
+    redirect("/sign-in");
+  }
+  return <DashboardClient />;
 }
