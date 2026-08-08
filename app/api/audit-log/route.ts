@@ -1,0 +1,3 @@
+import { getSql } from "@/db";
+import { requireUser } from "@/lib/access";
+export async function GET(){try{await requireUser();const sql=getSql();await sql.query(`CREATE TABLE IF NOT EXISTS dashboard_audit_logs (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),action text NOT NULL,entity_type text NOT NULL,entity_id text NOT NULL,summary text NOT NULL,before_json text,after_json text,actor text NOT NULL,created_at timestamptz NOT NULL DEFAULT now())`);const logs=await sql.query(`SELECT * FROM dashboard_audit_logs ORDER BY created_at DESC LIMIT 100`);return Response.json({logs})}catch(e){return Response.json({error:e instanceof Error?e.message:"อ่าน Audit Log ไม่สำเร็จ"},{status:500})}}
