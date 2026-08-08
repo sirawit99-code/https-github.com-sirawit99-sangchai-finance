@@ -5,3 +5,4 @@ node_modules
 .vercel
 drizzle/meta
 npm-debug.log*
+.env*
