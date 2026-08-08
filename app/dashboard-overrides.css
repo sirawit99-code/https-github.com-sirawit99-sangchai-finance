@@ -617,3 +617,32 @@ html,body{overflow-anchor:none}
 .senderSurface .recipientTable{max-height:680px;overflow:auto}.senderSurface .recipientTable tbody tr:nth-child(n+16){display:table-row}
 .vendorCard:has(.reviewDot.ยืนยันแล้ว){border:2px solid #22a06b!important;box-shadow:0 0 0 4px #dcfce755!important}.vendorCard:has(.reviewDot.ยืนยันแล้ว)>header{position:relative;padding-right:145px;background:linear-gradient(90deg,#f0fdf4,#fff)}.vendorCard:has(.reviewDot.ยืนยันแล้ว)>header::after{content:"✓ ยืนยันแล้ว";position:absolute;right:18px;top:18px;padding:7px 11px;border-radius:999px;background:#dcfce7;color:#047857;font-size:12px;font-weight:900}.vendorCard:has(.reviewDot.ยืนยันแล้ว) .vendorAccounts{background:#f0fdf4}.vendorCard:has(.reviewDot.ยืนยันแล้ว)>footer>button{font-size:0;background:#fff;color:#166534;border:2px solid #22a06b}.vendorCard:has(.reviewDot.ยืนยันแล้ว)>footer>button::after{content:"✎ แก้ไข";font-size:13px}.vendorCard:has(.reviewDot.ยืนยันแล้ว)>footer>button:disabled::after{content:"กำลังบันทึก…"}.vendorCard:not(:has(.reviewDot.ยืนยันแล้ว)){border-left:5px solid #f59e0b}.vendorCard:not(:has(.reviewDot.ยืนยันแล้ว))>header::before{content:"รอตรวจสอบ";position:absolute;right:20px;margin-top:4px;padding:6px 9px;border-radius:999px;background:#fff7ed;color:#c2410c;font-size:11px;font-weight:900}.vendorCard>header{position:relative}
 @media(max-width:650px){.vendorCard:has(.reviewDot.ยืนยันแล้ว)>header{padding-right:18px;padding-top:54px}.vendorCard:has(.reviewDot.ยืนยันแล้ว)>header::after{left:18px;right:auto;top:14px}.vendorCard:not(:has(.reviewDot.ยืนยันแล้ว))>header{padding-top:48px}.vendorCard:not(:has(.reviewDot.ยืนยันแล้ว))>header::before{left:18px;right:auto;top:12px}}
+
+/* Responsive viewport hardening for laptops, tablets and mobile browsers. */
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+.dashboardApp,.workspace,.appHeader,.headerTools{min-width:0}
+.dashboardApp{width:100%}
+.workspace{overflow-x:hidden}
+.txnTable,.recipientTable,.duplicateTable{max-width:100%;overscroll-behavior-x:contain}
+
+@media(max-width:1100px){
+  .sideNav nav{min-height:0;overflow-y:auto!important;overflow-x:hidden!important}
+  .sideNav nav a{justify-content:center;padding:10px!important}
+  .appHeader{gap:12px}
+  .headerTools{max-width:58%;gap:7px}
+}
+
+@media(max-width:760px){
+  .dashboardApp{display:block;width:100%;min-height:100dvh}
+  .sideNav{position:sticky;top:0;z-index:20;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:row;align-items:center;padding:7px 12px;overflow-x:auto;overscroll-behavior-x:contain}
+  .sideBrand{flex:0 0 auto;border:0;padding:0}.sideBrand img{width:54px;height:38px}
+  .sideNav nav{display:flex;min-width:max-content;margin:0 0 0 auto!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin}
+  .sideNav nav a{flex:0 0 auto;justify-content:flex-start}
+  .workspace{width:100%;padding:0 12px}
+  .appHeader{height:auto;min-height:0;flex-direction:column;align-items:stretch;padding:14px 0}
+  .appHeader>div:first-child{width:100%}
+  .appHeader h1{font-size:clamp(18px,5.4vw,23px);overflow-wrap:anywhere}
+  .headerTools{width:100%;max-width:none;justify-content:flex-start;overflow-x:auto;padding-bottom:3px}
+  .summaryStrip,.overviewGrid,.controlGrid,.auditGrid,.monitorGrid,.monitorControlGrid{width:100%;min-width:0}
+  .surface{max-width:100%;overflow:hidden}
+}
