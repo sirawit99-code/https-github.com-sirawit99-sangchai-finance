@@ -29,6 +29,7 @@ async function ensureDatabase(){
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_vendor_profiles_status ON vendor_profiles(review_status)"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_vendor_profiles_name ON vendor_profiles(canonical_name)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY,action TEXT NOT NULL,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,summary TEXT NOT NULL,before_json TEXT,after_json TEXT,actor TEXT NOT NULL DEFAULT 'Dashboard user',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`),
   ]);
   await env.DB.batch(seeds.map(row=>env.DB.prepare("INSERT OR IGNORE INTO vendor_profiles (id,source_name,canonical_name,category,accounts_json,transaction_count,total_amount_satang,review_status) VALUES (?,?,?,?,?,?,?,?)").bind(...row)));
 }
@@ -49,7 +50,10 @@ export async function PATCH(request:Request){
     if(!["รอตรวจสอบ","ยืนยันแล้ว","ต้องแก้ไข","ไม่ใช่รายเดียวกัน"].includes(status))return Response.json({error:"สถานะไม่ถูกต้อง"},{status:400});
     if(accounts.length===0)return Response.json({error:"คู่ค้าต้องมีอย่างน้อย 1 บัญชี"},{status:400});
     if(accounts.length>30||accounts.some(x=>x.length>80))return Response.json({error:"ข้อมูลบัญชีมากหรือยาวเกินไป"},{status:400});
+    const before=await env.DB.prepare("SELECT * FROM vendor_profiles WHERE id=?").bind(id).first();
     await env.DB.prepare("UPDATE vendor_profiles SET canonical_name=?,category=?,accounts_json=?,review_status=?,note=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(name,category,JSON.stringify(accounts),status,note,id).run();
+    const after=await env.DB.prepare("SELECT * FROM vendor_profiles WHERE id=?").bind(id).first();
+    await env.DB.prepare("INSERT INTO audit_logs (id,action,entity_type,entity_id,summary,before_json,after_json) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),"UPDATE","vendor",id,`แก้ไขคู่ค้า ${name}`,JSON.stringify(before),JSON.stringify(after)).run();
     return Response.json({ok:true});
   }catch(error){return Response.json({error:error instanceof Error?error.message:"บันทึกไม่สำเร็จ"},{status:500})}
 }
