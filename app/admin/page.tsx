@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
 import { desc, eq } from "drizzle-orm";
 import { requireUser } from "@/lib/access";
 import ApprovalConsole from "@/components/approval-console";
 import { getDb } from "@/db";
 import { approvalAuditLogs, approvalRequests } from "@/db/schema";
 import { approvalTypes, type ApprovalStatus } from "@/lib/approval";
+import { signOut } from "@/app/sign-in/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export default async function AdminPage() {
         </div>
         <div className="user-area">
           <div><strong>{actor.email}</strong><span>{actor.role.toUpperCase()}</span></div>
-          <UserButton />
+          <form action={signOut}><button className="logout-button" type="submit">ออกจากระบบ</button></form>
         </div>
       </header>
       <ApprovalConsole role={actor.role} initialApprovals={initialApprovals} initialAudit={initialAudit} />

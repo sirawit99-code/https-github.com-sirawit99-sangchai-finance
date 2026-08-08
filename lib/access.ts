@@ -1,4 +1,5 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
+import { readSession } from "@/lib/session";
 
 export type AppRole = "admin" | "reviewer" | "viewer";
 
@@ -10,15 +11,12 @@ function allowlist() {
 }
 
 export async function requireUser() {
-  const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress.toLowerCase();
-  if (!user || !email) throw new Error("UNAUTHENTICATED");
-  const assignedRole = user.publicMetadata.role;
-  let role: AppRole;
-  if (allowlist().includes(email)) role = "admin";
-  else if (assignedRole === "reviewer" || assignedRole === "viewer") role = assignedRole;
-  else throw new Error("FORBIDDEN");
-  return { userId: user.id, email, role };
+  const token = (await cookies()).get("sangchai_session")?.value;
+  const session = await readSession(token);
+  if (!session) throw new Error("UNAUTHENTICATED");
+  const email = session.email.toLowerCase();
+  if (!allowlist().includes(email)) throw new Error("FORBIDDEN");
+  return { userId: email, email, role: "admin" as AppRole };
 }
 
 export async function requireApprover() {

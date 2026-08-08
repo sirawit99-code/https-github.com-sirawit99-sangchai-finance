@@ -1,8 +1,4 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
-
-export default clerkMiddleware({
-  frontendApiProxy: { enabled: true },
-});
+export default function proxy() {}
 
 export const config = {
   matcher: [

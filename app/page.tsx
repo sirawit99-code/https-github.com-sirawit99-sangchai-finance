@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export default function Home() {
-  const authReady = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
+  const authReady = Boolean(process.env.AUTH_SECRET && process.env.AUTH_PASSWORD && process.env.ADMIN_EMAILS);
   const dbReady = Boolean(process.env.DATABASE_URL);
 
   return (
@@ -20,7 +20,7 @@ export default function Home() {
         ) : (
           <div className="setup-note">
             <strong>โปรเจกต์พร้อม Deploy</strong>
-            <span>เชื่อม Clerk และ Neon บน Vercel แล้วกำหนด Environment Variables ก่อนเริ่มใช้งาน</span>
+            <span>กำหนดระบบ Login และเชื่อมฐานข้อมูล Neon บน Vercel ก่อนเริ่มใช้งาน</span>
           </div>
         )}
       </section>
