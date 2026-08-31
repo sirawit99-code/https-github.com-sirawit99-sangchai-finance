@@ -361,6 +361,39 @@
   font: inherit;
 }
 
+.bankDataPeriod {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  margin-top: 11px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--bank) 22%, #dfe4ec);
+  border-left: 4px solid var(--bank);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bank) 5%, #fff);
+}
+
+.bankDataPeriod span {
+  grid-column: 1 / 3;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.bankDataPeriod b {
+  color: var(--navy);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.bankDataPeriod small {
+  align-self: center;
+  color: var(--bank);
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .compareAll {
   border: 1px solid #cbd3e1;
   border-radius: 8px;

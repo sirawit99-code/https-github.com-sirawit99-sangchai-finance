@@ -18,6 +18,17 @@ const bankColor:Record<string,string>={KBANK:"#239a60",BBL:"#254aa5",KTB:"#0aa8d
 const monthNames:Record<string,string>={"01":"ม.ค.","02":"ก.พ.","03":"มี.ค.","04":"เม.ย.","05":"พ.ค.","06":"มิ.ย.","07":"ก.ค."};
 const recipientKey=(name:string)=>name.toLocaleLowerCase("th-TH").replace(/(?:บริษัท|บริษัทฯ|บจ\.?|หจก\.?|co\.?\s*,?\s*ltd\.?|company\s+limited)/giu,"").replace(/[^\p{L}\p{N}]/gu,"");
 
+function statementPeriod(transactions:Txn[],bank:string){
+  let start="",end="";
+  for(const transaction of transactions){
+    if(transaction.bank!==bank||!transaction.date)continue;
+    if(!start||transaction.date<start)start=transaction.date;
+    if(!end||transaction.date>end)end=transaction.date;
+  }
+  const display=(date:string)=>date?new Date(`${date}T00:00:00+07:00`).toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"numeric"}):"ไม่พบวันที่";
+  return {start,end,label:start&&end?`${display(start)} – ${display(end)}`:"ไม่พบช่วงข้อมูล"};
+}
+
 function outgoingAccount(t:Txn){
   const d=t.description;
   if(t.bank==="KTB"){const m=d.match(/TR to\s+(\d{6,})/i);if(m)return `${t.bank} ${m[1]}`}
@@ -29,7 +40,7 @@ function outgoingIdentity(t:Txn){
   const d=t.description.replace(/\+\+$/g,"").trim();
   if(t.bank==="KBANK"){
     if(d.includes("สาขาถนนท่าแพ"))return {name:"ถอนเงินสดผ่านสาขา",category:"ถอนเงินสด",identified:false};
-    let name=d.replace(/^K BIZ (?:โอนไป|เพื่อชำระ)\s*/i,"").replace(/^(?:KBANK|BBL|KTB|SCB|SCBT|UOBT|BAY|TTB)\s+/i,"").replace(/^(?:Ref\s+)?X\d+\s*/i,"").trim();
+    const name=d.replace(/^K BIZ (?:โอนไป|เพื่อชำระ)\s*/i,"").replace(/^(?:KBANK|BBL|KTB|SCB|SCBT|UOBT|BAY|TTB)\s+/i,"").replace(/^(?:Ref\s+)?X\d+\s*/i,"").trim();
     if(name&&name!==d){
       const internal=/แสงชัยพาณิช/i.test(name);
       const person=/^(?:นาย|นาง|น\.ส\.|นางสาว)|Pongsak|Somchai/i.test(name);
@@ -61,7 +72,7 @@ function incomingIdentity(t:Txn){
   if(t.bank==="KBANK"){
     if(/EDC\/K SHOP\/MYQR|401014604133001 SANGCHAI/i.test(d))return {name:"ยอดขาย EDC / QR แสงชัยพาณิชย์",category:"EDC / QR",identified:false};
     if(d.includes("สาขาถนนท่าแพ"))return {name:"ฝากเงินผ่านสาขาถนนท่าแพ",category:"ฝากเงินสด/เช็ค",identified:false};
-    let name=d.split(/\sจาก\s/i).slice(1).join(" จาก ").replace(/^(?:KBANK|BBL|KTB|SCB|SCBT|UOBT|BAY|TTB|SMART BBL)\s+/i,"").replace(/^X\d+\s*/i,"").trim();
+    const name=d.split(/\sจาก\s/i).slice(1).join(" จาก ").replace(/^(?:KBANK|BBL|KTB|SCB|SCBT|UOBT|BAY|TTB|SMART BBL)\s+/i,"").replace(/^X\d+\s*/i,"").trim();
     if(name){const internal=/SANGCHAI|แสงชัยพาณิช/i.test(name),person=/^(?:นาย|นาง|น\.ส\.|นางสาว|MR\.|MS\.|MRS\.)/i.test(name);return {name,category:internal?"โอนภายใน":person?"บุคคล":"ลูกค้า/บริษัท",identified:true}}
   }
   if(t.bank==="BBL"){
@@ -103,6 +114,7 @@ export default function Home(){
   const [auditLogs,setAuditLogs]=useState<AuditLog[]>([]);
   const [reconciliationReview,setReconciliationReview]=useState<ReconciliationReview|null>(null);
   const [latestStatementDate,setLatestStatementDate]=useState("2026-07-31");
+  const [currentTime]=useState(()=>Date.now());
   async function refreshDashboard(manual=false){
     setRefreshState("loading");
     try{
@@ -175,7 +187,7 @@ export default function Home(){
   const duplicateCandidateTotal=duplicateCandidates.reduce((sum,group)=>sum+group.slice(1).reduce((s,x)=>s+x.amount,0),0);
   const reconciliation=data.banks.map(b=>({...b,difference:b.opening+b.incoming-b.outgoing-b.ending}));
   const reconciliationPassed=reconciliation.filter(b=>Math.abs(b.difference)<0.01).length;
-  const dataAge=Math.max(0,Math.floor((Date.now()-new Date(`${latestStatementDate}T00:00:00+07:00`).getTime())/86400000));
+  const dataAge=Math.max(0,Math.floor((currentTime-new Date(`${latestStatementDate}T00:00:00+07:00`).getTime())/86400000));
   const comparedBanks=selectedBank==="all"?data.banks:data.banks.filter(b=>b.bank===selectedBank);
   const maxBankFlow=Math.max(...data.banks.flatMap(b=>[b.incoming,b.outgoing]));
   const pageSize=40,pages=Math.max(1,Math.ceil(rows.length/pageSize)),shown=rows.slice((page-1)*pageSize,page*pageSize);
@@ -199,7 +211,7 @@ export default function Home(){
     {view==="overview"&&<><section className="summaryStrip"><article className="primaryKpi"><span>เงินคงเหลือรวม 31 ก.ค.</span><strong>฿{fmt(t.ending)}</strong><small>ต้นงวด ฿{fmt(t.opening)}</small></article><article><span>เงินเข้ารวม</span><strong className="blue">฿{short(t.incoming)}</strong><small>ยอดจริง {fmt(t.incoming)} บาท</small></article><article><span>เงินออกรวม</span><strong className="red">฿{short(t.outgoing)}</strong><small>ยอดจริง {fmt(t.outgoing)} บาท</small></article><article><span>ยอดคงเหลือเปลี่ยนแปลง</span><strong className="red">−฿{short(Math.abs(change))}</strong><small>ลดลง {Math.abs(change/t.opening*100).toFixed(2)}%</small></article></section>
     <section className="overviewGrid"><article className="surface chartSurface"><div className="sectionHead"><div><p>MONTHLY CASH MOVEMENT</p><h2>เงินเข้า–ออก และยอดคงเหลือรายเดือน</h2></div><div className="chartKey"><span><i className="in"/>เงินเข้า</span><span><i className="out"/>เงินออก</span></div></div><div className="monthBars">{data.combined.map(m=><div className="monthGroup" key={m.label}><div className="bars"><i className="incoming" style={{height:`${m.incoming/maxMonth*100}%`}} title={`เงินเข้า ${fmt(m.incoming)}`}/><i className="outgoing" style={{height:`${m.outgoing/maxMonth*100}%`}} title={`เงินออก ${fmt(m.outgoing)}`}/></div><b>{m.label}</b><span className={m.net>=0?"up":"down"}>{m.net>=0?"+":"−"}{short(Math.abs(m.net))}</span><small>เหลือ {short(m.ending)}</small></div>)}</div></article>
     <article className="surface attentionSurface"><div className="sectionHead"><div><p>MANAGEMENT ATTENTION</p><h2>รายการที่ควรดำเนินการ</h2></div><span className="alertCount">{data.alerts.length} เรื่อง</span></div><div className="alertList">{data.alerts.map((a,i)=><article key={a.title} className={a.level}><span>{i+1}</span><div><b>{a.title}</b><p>{a.detail}</p><small>ควรทำ: {a.action}</small></div></article>)}</div></article></section>
-    <section className="surface bankSurface"><div className="sectionHead"><div><p>BANK POSITION</p><h2>กดเลือกธนาคารเพื่อดูเงินเข้า–ออก</h2></div><button className="compareAll" onClick={()=>setSelectedBank("all")}>เปรียบเทียบทั้ง 3 ธนาคาร</button></div><div className="bankCards">{data.banks.map(b=>{const delta=b.ending-b.opening;return <article className={selectedBank===b.bank?"selected":""} key={b.bank} style={{"--bank":bankColor[b.bank]} as React.CSSProperties} onClick={()=>setSelectedBank(b.bank)}><button className="bankSelect" aria-pressed={selectedBank===b.bank} onClick={()=>setSelectedBank(b.bank)}><div className="bankTitle"><i/><div><b>{b.bank}</b><small>{b.account}</small></div><em>{selectedBank===b.bank?"กำลังแสดง":"กดดูรายละเอียด"}</em></div><div className="bankBalance"><span>ปลายงวด</span><strong>฿{fmt(b.ending)}</strong></div><div className="bankStats"><span>ต้นงวด<b>{fmt(b.opening)}</b></span><span>เงินเข้า<b>{fmt(b.incoming)}</b></span><span>เงินออก<b>{fmt(b.outgoing)}</b></span></div><div className="bankDelta"><span>เปลี่ยนแปลง</span><b className="red">−฿{fmt(Math.abs(delta))}</b><small>ลดลง {Math.abs(delta/b.opening*100).toFixed(2)}%</small></div></button></article>})}</div>
+    <section className="surface bankSurface"><div className="sectionHead"><div><p>BANK POSITION</p><h2>กดเลือกธนาคารเพื่อดูเงินเข้า–ออก</h2></div><button className="compareAll" onClick={()=>setSelectedBank("all")}>เปรียบเทียบทั้ง 3 ธนาคาร</button></div><div className="bankCards">{data.banks.map(b=>{const delta=b.ending-b.opening,period=statementPeriod(data.transactions,b.bank);return <article className={selectedBank===b.bank?"selected":""} key={b.bank} style={{"--bank":bankColor[b.bank]} as React.CSSProperties} onClick={()=>setSelectedBank(b.bank)}><button className="bankSelect" aria-pressed={selectedBank===b.bank} onClick={()=>setSelectedBank(b.bank)}><div className="bankTitle"><i/><div><b>{b.bank}</b><small>{b.account}</small></div><em>{selectedBank===b.bank?"กำลังแสดง":"กดดูรายละเอียด"}</em></div><div className="bankDataPeriod"><span>ช่วงข้อมูลที่ใช้</span><b>{period.label}</b><small>{b.transactions.toLocaleString("th-TH")} รายการ</small></div><div className="bankBalance"><span>ปลายงวด</span><strong>฿{fmt(b.ending)}</strong></div><div className="bankStats"><span>ต้นงวด<b>{fmt(b.opening)}</b></span><span>เงินเข้า<b>{fmt(b.incoming)}</b></span><span>เงินออก<b>{fmt(b.outgoing)}</b></span></div><div className="bankDelta"><span>เปลี่ยนแปลง</span><b className="red">−฿{fmt(Math.abs(delta))}</b><small>ลดลง {Math.abs(delta/b.opening*100).toFixed(2)}%</small></div></button></article>})}</div>
     <div className="bankComparison"><div className="comparisonHead"><div><p>IN / OUT COMPARISON</p><h3>{selectedBank==="all"?"เปรียบเทียบเงินเข้า–ออกทั้ง 3 ธนาคาร":`รายละเอียดเงินเข้า–ออก ${selectedBank}`}</h3></div><div className="comparisonTabs"><button className={selectedBank==="all"?"active":""} onClick={()=>setSelectedBank("all")}>ทั้งหมด</button>{data.banks.map(b=><button className={selectedBank===b.bank?"active":""} key={b.bank} onClick={()=>setSelectedBank(b.bank)}>{b.bank}</button>)}</div></div><div className={`comparisonRows ${selectedBank!=="all"?"single":""}`}>{comparedBanks.map(b=>{const net=b.incoming-b.outgoing;return <article key={b.bank} style={{"--bank":bankColor[b.bank]} as React.CSSProperties}><header><span><i/>{b.bank}<small>{b.account}</small></span><strong className={net>=0?"up":"red"}>{net>=0?"+":"−"}฿{fmt(Math.abs(net))}</strong></header><div className="flowCompare"><div><span>เงินเข้า</span><b className="blue">฿{fmt(b.incoming)}</b><i><em style={{width:`${b.incoming/maxBankFlow*100}%`}}/></i></div><div><span>เงินออก</span><b className="red">฿{fmt(b.outgoing)}</b><i><em style={{width:`${b.outgoing/maxBankFlow*100}%`}}/></i></div></div><footer><span>ยอดปลายงวด <b>฿{fmt(b.ending)}</b></span><span>{b.transactions.toLocaleString("th-TH")} รายการ</span></footer></article>})}</div></div></section>
     <section className="controlGrid"><article className="surface internalCard"><div className="sectionHead"><div><p>INTERNAL TRANSFER</p><h2>การโยกเงินระหว่าง 3 บัญชี</h2></div><b>฿{fmt(t.internal)}</b></div><div className="route"><span>KTB</span><i>5 รายการ →</i><span>KBANK</span></div><p>จับคู่วันที่ เวลา จำนวนเงิน และชื่อบัญชีตรงกันครบ ควรตัดออกทั้งฝั่งเงินเข้าและเงินออกเมื่อวิเคราะห์กระแสเงินภายนอก</p></article><article className="surface controlCard"><div className="sectionHead"><div><p>CONTROL STATUS</p><h2>สถานะคุณภาพข้อมูล</h2></div></div>{data.quality.map(q=><div className="qualityRow" key={q.label}><i className={q.status}>{q.status==="pass"?"✓":"!"}</i><span><b>{q.label}</b><small>{q.detail}</small></span></div>)}</article></section>
     <section className="surface relatedTransferCard"><div className="sectionHead"><div><p>RELATED ACCOUNTS · PENDING VERIFICATION</p><h2>บัญชีชื่อกิจการที่รอ Statement ยืนยัน</h2></div><span className="pendingBadge">ยังไม่รวมในยอดโอนภายใน</span></div><div className="relatedKpis"><article><span>KBANK → X1654 / X9397</span><strong className="red">฿{fmt(pendingRelated.outgoing)}</strong><small>{pendingRelated.outCount} ครั้ง · เงินออกเดือนกรกฎาคม</small></article><article><span>X9397 → KBANK</span><strong className="blue">฿{fmt(pendingRelated.incoming)}</strong><small>{pendingRelated.inCount} ครั้ง · เงินเข้าเดือนกรกฎาคม</small></article></div><div className="relatedBreakdown"><div><b>X1654 · เงินออก 2 ครั้ง</b><span>11 ก.ค. 8,000,000.00 บาท · 13 ก.ค. 6,796,330.84 บาท</span><strong>รวม 14,796,330.84 บาท</strong></div><div><b>X9397 · เงินออก 4 ครั้ง</b><span>11 ก.ค. 24,543.65 + 86,720.00 + 4,582.00 บาท · 17 ก.ค. 92,235.14 บาท</span><strong>รวม 208,080.79 บาท</strong></div><div><b>X9397 · เงินเข้า 3 ครั้ง</b><span>18 ก.ค. 24,020.00 บาท · 25 ก.ค. 61,545.33 + 1,344,934.85 บาท</span><strong>รวม 1,430,500.18 บาท</strong></div></div><div className="relatedConclusion"><b>สรุปวิธีอ่าน</b><p>ชื่อบัญชีมีลักษณะเป็นกิจการเกี่ยวข้อง แต่ยังไม่มี Statement ของ X1654 และ X9397 ให้จับคู่ปลายทาง จึงจัดเป็น “รอตรวจสอบ” และไม่นำไปบวกกับยอดที่ยืนยันแล้ว 3,500,000.00 บาท</p></div></section></>}
