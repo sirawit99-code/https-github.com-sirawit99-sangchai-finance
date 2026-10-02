@@ -83,7 +83,12 @@ def main():
         bank["months"].append({"label":"ก.ย.","incoming":incoming,"outgoing":outgoing,"ending":ending}); bank["incoming"] = round(sum(m["incoming"] for m in bank["months"]),2); bank["outgoing"] = round(sum(m["outgoing"] for m in bank["months"]),2); bank["ending"] = ending; bank["september_opening"] = opening
     data["transactions"].sort(key=lambda r:(r["date"],r["time"],r["bank"]))
     for bank in data["banks"]: bank["transactions"] = sum(r["bank"] == bank["bank"] for r in data["transactions"])
-    rows = [r for r in data["transactions"] if r["date"].startswith("2026-09")]; incoming = round(sum(r["amount"] for r in rows if r["direction"] == "in"),2); outgoing = round(sum(r["amount"] for r in rows if r["direction"] == "out"),2)
+    rows = [r for r in data["transactions"] if r["date"].startswith("2026-09")]
+    # Monthly management totals follow each statement footer. BBL's traceable
+    # transaction rows are lower by 55,331.97 on both sides; that exception is
+    # retained separately in the data-quality warning.
+    incoming = round(sum(result[3] for result in parsed.values()), 2)
+    outgoing = round(sum(result[4] for result in parsed.values()), 2)
     data["combined"] = [m for m in data["combined"] if m["label"] != "ก.ย."]; data["combined"].append({"label":"ก.ย.","incoming":incoming,"outgoing":outgoing,"net":round(incoming-outgoing,2),"ending":round(sum(b["ending"] for b in data["banks"]),2)})
     data["totals"]["incoming"] = round(sum(b["incoming"] for b in data["banks"]),2); data["totals"]["outgoing"] = round(sum(b["outgoing"] for b in data["banks"]),2); data["totals"]["ending"] = round(sum(b["ending"] for b in data["banks"]),2); data["meta"]["period"] = "1 ม.ค. - 30 ก.ย. 2569"; data["meta"]["generated"] = datetime.now(timezone(timedelta(hours=7))).isoformat(timespec="seconds")
     for item in data.get("quality",[]):
