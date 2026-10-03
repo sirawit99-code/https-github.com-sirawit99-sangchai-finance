@@ -1,98 +1,85 @@
-# vinext-starter
+# Sangchai Finance Control Center
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+Dashboard ตรวจสอบ Statement ของ KBANK, BBL และ KTB สำหรับผู้บริหาร ครอบคลุมเงินเข้า เงินออก ยอดคงเหลือ EDC คู่ค้า การกระทบยอด และ Audit Log
 
-## Prerequisites
+ข้อมูลตัวอย่างที่ติดมากับ Source Code ครอบคลุม **1 มกราคม–30 กันยายน 2569** ส่วนข้อมูลที่ผู้ใช้บันทึกผ่านหน้าเว็บและไฟล์หลักฐานที่อัปโหลดจริงเก็บในฐานข้อมูล/พื้นที่ไฟล์ของระบบ Hosting
 
-- Node.js `>=22.13.0`
+## เปิดใน Codex เครื่องใหม่
 
-## Quick Start
+### สิ่งที่ต้องมี
+
+- Codex Desktop
+- Git
+- Node.js 22.13 ขึ้นไป
+- npm
+- สิทธิ์อ่าน GitHub repository นี้
+- หากต้องแก้เว็บออนไลน์เดิม: บัญชี Codex ที่มีสิทธิ์ Editor/Owner ของ Sites project
+
+### ติดตั้งแบบเร็ว
 
 ```bash
-npm install
+git clone --branch sites-dashboard-portable --single-branch https://github.com/sirawit99-code/https-github.com-sirawit99-sangchai-finance.git
+cd https-github.com-sirawit99-sangchai-finance
+npm run setup:codex
 npm run dev
-npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+เปิด `http://localhost:3000`
 
-## Included Shape
+หาก Clone ไว้แล้ว:
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+git pull
+npm run setup:codex
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+`setup:codex` จะตรวจเวอร์ชัน Node, ติดตั้ง dependency ด้วย `npm ci`, ตรวจไฟล์สำคัญ, lint, test และ build ให้ครบ
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+## คำสั่งสำคัญ
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+```bash
+npm run doctor       # ตรวจว่าเครื่องพร้อมและข้อมูลหลักครบ
+npm run dev          # เปิด Dashboard สำหรับพัฒนา
+npm run lint         # ตรวจโค้ด
+npm test             # Build และทดสอบระบบ
+npm run build        # สร้าง production build
+npm run setup:codex  # เตรียมเครื่องใหม่แบบครบชุด
+```
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+## โครงสร้างข้อมูล
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+- `public/dashboard-data.json` — Snapshot รายการและยอดสรุปที่ Dashboard ใช้
+- `public/sangchai-finance-dashboard.pdf` — รายงาน PDF ล่าสุด
+- `app/api/` — API สำหรับทะเบียนไฟล์ คู่ค้า Audit Log และสถานะกระทบยอด
+- `scripts/` — ตัวนำเข้า Statement และเครื่องมือจัดทำรายงาน
+- `.openai/hosting.json` — Binding ของ Sites: ฐานข้อมูล `DB` และพื้นที่ไฟล์ `FILES`
+- `PROJECT_CONTEXT.md` — กติกาทางบัญชี ข้อจำกัด และบริบทสำหรับ Codex เครื่องใหม่
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+## ฐานข้อมูลและไฟล์อัปโหลด
 
-## Useful Commands
+เมื่อ Run ในเครื่องใหม่ ระบบ local จะสร้าง D1/R2 จำลองไว้ใน `.wrangler/` โดยอัตโนมัติ ข้อมูลตั้งต้นจะถูก Seed จากโค้ด แต่ข้อมูลต่อไปนี้ **ไม่ได้เดินทางมากับ Git**:
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+- การแก้ไข/ยืนยันฐานข้อมูลคู่ค้าในระบบออนไลน์
+- Audit Log ที่เกิดหลังใช้งานจริง
+- สถานะกระทบยอดที่ผู้บริหารบันทึก
+- ไฟล์ PDF/XLS ที่ผู้ใช้อัปโหลดเข้า R2
 
-## Learn More
+การทำงานกับเว็บเดิมต้องใช้ Sites project ID ใน `.openai/hosting.json` และบัญชีที่ได้รับสิทธิ์ใน Project เดิม หากสร้าง Project ใหม่ ต้อง Export/Import D1 และคัดลอก R2 แยกต่างหาก
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+## ความปลอดภัย
+
+- ห้าม Commit Statement ต้นฉบับ รหัสเปิด PDF ไฟล์ `.env` หรือข้อมูลรับรองระบบ
+- Statement ต้นฉบับควรเก็บในพื้นที่เข้ารหัสหรือ Cloud Storage ที่กำหนดสิทธิ์
+- ไฟล์ `.env.example` มีเฉพาะชื่อค่าที่อาจต้องตั้ง ไม่มีรหัสจริง
+- เว็บไซต์มีข้อมูลทางการเงิน ควรตรวจ Access Policy ก่อนเผยแพร่ทุกครั้ง
+
+## ก่อนแก้หรือเผยแพร่
+
+```bash
+git status
+npm run doctor
+npm run lint
+npm test
+```
+
+จากนั้น Commit และ Push ขึ้น GitHub ก่อนเผยแพร่ Hosting เพื่อให้ Source Code ของทุกเครื่องตรงกัน
